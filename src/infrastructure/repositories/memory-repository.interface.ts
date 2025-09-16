@@ -43,24 +43,39 @@ export interface SimilarResult {
  * Repository interface for Memory persistence operations.
  *
  * Provides database-agnostic abstraction for storing and retrieving Memory objects
- * with full multi-tenant isolation. This interface can be implemented by various
- * database backends including PostgreSQL, DuckDB, or vector stores.
+ * with full multi-tenant isolation. Each method is an atomic operation - transaction
+ * orchestration and unit-of-work concerns are handled by the application layer.
+ *
+ * This interface can be implemented by various database backends including PostgreSQL,
+ * DuckDB, or vector stores while maintaining clean separation of concerns.
  *
  * @example
  * ```typescript
+ * // Single atomic operation
  * const repository: MemoryRepository = new PostgresMemoryRepository(client);
  * await repository.save(memory, tenantId);
- * const similar = await repository.findSimilar(embedding, 0.8, tenantId);
+ *
+ * // Multi-operation transaction requires unit-of-work orchestration
+ * const uow = new PostgresUnitOfWork(client);
+ * await uow.execute(async (transaction) => {
+ *   const repo = new PostgresMemoryRepository(transaction);
+ *   await repo.save(memory1, tenantId);
+ *   await repo.save(memory2, tenantId);
+ * });
  * ```
  */
 export interface MemoryRepository {
   /**
-   * Persist a Memory object to the repository.
+   * Persist a Memory object to the repository as a single atomic operation.
+   *
+   * Saves the memory and all related entities (tags, entities, actions, embedding,
+   * source) in individual database operations. For transactional consistency across
+   * multiple saves, use PostgresUnitOfWork to coordinate the transaction.
    *
    * @param memory - The Memory object to save, including all related entities
    * @param tenantId - UUID identifying the tenant for multi-tenant isolation
-   * @throws {ValidationError} When memory fails domain validation
-   * @throws {DatabaseError} When persistence operation fails
+   * @throws {ValidationError} Memory fails domain validation
+   * @throws {DatabaseError} Persistence operation fails
    */
   save(memory: Memory, tenantId: string): Promise<void>;
 
@@ -100,8 +115,8 @@ export interface MemoryRepository {
    * @param limit - Maximum number of results to return (default: 10)
    * @param metric - Vector similarity metric to use (default: "cosine")
    * @returns Array of similar memories with distance/similarity scores, ordered by relevance (best first)
-   * @throws {ValidationError} When embedding dimensions don't match stored embeddings
-   * @throws {DatabaseError} When vector search operation fails
+   * @throws {ValidationError} Embedding dimensions don't match stored embeddings
+   * @throws {DatabaseError} Vector search operation fails
    */
   findSimilar(
     embedding: Embedding,

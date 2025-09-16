@@ -2,7 +2,7 @@ import {
   assertAlmostEquals,
   assertEquals,
   assertThrows,
-} from "jsr:@std/assert";
+} from "@std/assert";
 import { Embedding } from "./embedding.ts";
 import { ValidationError } from "@/domain/shared/errors.ts";
 

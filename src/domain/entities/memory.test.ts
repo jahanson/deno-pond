@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from "jsr:@std/assert";
+import { assertEquals, assertThrows } from "@std/assert";
 import { Memory } from "./memory.ts";
 import { ValidationError } from "@/domain/shared/errors.ts";
 import { MemoryStatus, SourceType } from "@/domain/shared/types.ts";

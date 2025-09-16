@@ -64,5 +64,11 @@
         "jsr:@std/data-structures"
       ]
     }
+  },
+  "workspace": {
+    "dependencies": [
+      "jsr:@db/postgres@~0.19.5",
+      "jsr:@std/assert@^1.0.14"
+    ]
   }
 }

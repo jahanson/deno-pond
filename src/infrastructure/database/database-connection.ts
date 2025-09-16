@@ -1,4 +1,4 @@
-import { Client, Pool } from "jsr:@db/postgres";
+import { Client, Pool, Transaction } from "@db/postgres";
 
 /**
  * Configuration options for database connection.
@@ -109,7 +109,8 @@ export class DatabaseConnection {
     }
 
     // Auto-detect from environment
-    const env = Deno.env.get("NODE_ENV") || Deno.env.get("DENO_ENV") || "development";
+    const env = Deno.env.get("NODE_ENV") || Deno.env.get("DENO_ENV") ||
+      "development";
     return env === "production" ? "pool" : "single";
   }
 
@@ -122,7 +123,7 @@ export class DatabaseConnection {
    * @param fn - Function to execute within the transaction
    * @returns Promise resolving to the function's result
    */
-  async withTransaction<T>(fn: (transaction: any) => Promise<T>): Promise<T> {
+  async withTransaction<T>(fn: (transaction: Transaction) => Promise<T>): Promise<T> {
     return await this.withClient(async (client) => {
       const transaction = client.createTransaction("user_transaction");
 
@@ -174,7 +175,7 @@ export class DatabaseConnection {
    *
    * @param opts - Optional configuration for pool initialization
    */
-  async initPool(opts?: { lazy?: boolean }): Promise<Pool> {
+  initPool(opts?: { lazy?: boolean }): Pool {
     if (this.pool) return this.pool;
 
     const connectionConfig = this.getConnectionConfig();
@@ -311,8 +312,12 @@ export class DatabaseConnection {
    */
   static fromEnv(): DatabaseConnection {
     const databaseUrl = Deno.env.get("DATABASE_URL");
-    const env = Deno.env.get("NODE_ENV") || Deno.env.get("DENO_ENV") || "development";
-    const explicitMode = Deno.env.get("DB_CONNECTION_MODE") as "single" | "pool" | undefined;
+    const env = Deno.env.get("NODE_ENV") || Deno.env.get("DENO_ENV") ||
+      "development";
+    const explicitMode = Deno.env.get("DB_CONNECTION_MODE") as
+      | "single"
+      | "pool"
+      | undefined;
 
     const config: DatabaseConfig = {
       host: Deno.env.get("DB_HOST") || "localhost",

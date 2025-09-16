@@ -1,4 +1,4 @@
-import { Client } from "jsr:@db/postgres";
+import { Client } from "@db/postgres";
 
 /**
  * Represents a database schema migration.
@@ -108,7 +108,7 @@ export class MigrationRunner {
     return result.rows.length > 0 ? result.rows[0].version : 0;
   }
 
-  async rollback(_targetVersion: number): Promise<void> {
+  rollback(_targetVersion: number): void {
     // TODO: Implement rollback functionality
     // This would require down migrations
     console.warn("Rollback functionality not yet implemented");
