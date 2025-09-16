@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noImplicitThis": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
+  },
+  "tasks": {
+    "dev": "deno run --allow-net --allow-read --allow-env --watch src/main.ts",
+    "test": "deno test --allow-net --allow-read --allow-env --coverage=coverage",
+    "test:watch": "deno test --allow-net --allow-read --allow-env --watch",
+    "coverage": "deno coverage coverage --html",
+    "check": "deno check src/**/*.ts",
+    "fmt": "deno fmt .",
+    "fmt:check": "deno fmt --check ."
+  },
+  "imports": {
+    "@/": "./src/",
+    "@/domain/": "./src/domain/",
+    "@/infrastructure/": "./src/infrastructure/",
+    "@/application/": "./src/application/",
+    "@/api/": "./src/api/",
+    "@/config/": "./src/config/"
+  },
+  "exclude": [
+    "coverage/"
+  ]
+}

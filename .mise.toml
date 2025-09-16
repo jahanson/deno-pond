@@ -1,0 +1,51 @@
+[tasks.pre-commit]
+description = "Pre-commit checks for code quality"
+run = [
+  "echo '🔍 Running pre-commit checks...'",
+  "deno task fmt:check",
+  "deno lint src/",
+  "deno task check",
+  "echo '✅ All pre-commit checks passed!'"
+]
+
+[tasks.pre-commit-with-tests]
+description = "Pre-commit checks including tests (slower but thorough)"
+run = [
+  "echo '🔍 Running comprehensive pre-commit checks...'",
+  "deno task fmt:check",
+  "deno lint src/",
+  "deno task check",
+  "deno task test",
+  "echo '✅ All pre-commit checks and tests passed!'"
+]
+
+[tasks.format]
+description = "Format all code"
+run = "deno task fmt"
+
+[tasks.setup-git-hooks]
+description = "Install git pre-commit hook (idempotent)"
+run = '''
+echo "🪝 Checking git pre-commit hook setup..."
+if [ -f .git/hooks/pre-commit ] && grep -q "mise run pre-commit" .git/hooks/pre-commit; then
+  echo "✅ Pre-commit hook already installed"
+else
+  echo "📝 Installing pre-commit hook..."
+  mkdir -p .git/hooks
+  cat > .git/hooks/pre-commit << 'EOF'
+#!/bin/sh
+# Pre-commit hook managed by mise
+mise run pre-commit
+EOF
+  chmod +x .git/hooks/pre-commit
+  echo "✅ Git pre-commit hook installed! Use mise run pre-commit-with-tests for thorough checks."
+fi
+'''
+
+[tasks.lint]
+description = "Run linter on source code"
+run = "deno lint src/"
+
+[tasks.typecheck]
+description = "Run TypeScript type checking"
+run = "deno task check"
