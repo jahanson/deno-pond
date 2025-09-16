@@ -2,7 +2,9 @@
   "version": "5",
   "specifiers": {
     "jsr:@db/postgres@*": "0.19.5",
+    "jsr:@db/postgres@~0.19.5": "0.19.5",
     "jsr:@std/assert@*": "1.0.14",
+    "jsr:@std/assert@^1.0.14": "1.0.14",
     "jsr:@std/async@^1.0.13": "1.0.14",
     "jsr:@std/bytes@^1.0.5": "1.0.6",
     "jsr:@std/crypto@^1.0.4": "1.0.5",
@@ -11,7 +13,8 @@
     "jsr:@std/fmt@^1.0.6": "1.0.8",
     "jsr:@std/internal@^1.0.10": "1.0.10",
     "jsr:@std/path@^1.0.8": "1.1.2",
-    "jsr:@std/testing@*": "1.0.15"
+    "jsr:@std/testing@*": "1.0.15",
+    "jsr:@std/testing@^1.0.15": "1.0.15"
   },
   "jsr": {
     "@db/postgres@0.19.5": {
@@ -68,7 +71,8 @@
   "workspace": {
     "dependencies": [
       "jsr:@db/postgres@~0.19.5",
-      "jsr:@std/assert@^1.0.14"
+      "jsr:@std/assert@^1.0.14",
+      "jsr:@std/testing@^1.0.15"
     ]
   }
 }
