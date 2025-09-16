@@ -1,7 +1,11 @@
 import { Client } from "jsr:@db/postgres";
 import { Memory } from "@/domain/entities/memory.ts";
 import { Embedding } from "@/domain/entities/embedding.ts";
-import { MemoryRepository } from "./memory-repository.interface.ts";
+import {
+  MemoryRepository,
+  SimilarResult,
+  SimilarityMetric
+} from "./memory-repository.interface.ts";
 
 /**
  * PostgreSQL implementation of the MemoryRepository interface.
@@ -136,14 +140,17 @@ export class PostgresMemoryRepository implements MemoryRepository {
     threshold: number,
     tenantId: string,
     limit: number = 10,
-  ): Promise<Array<{ memory: Memory; similarity: number }>> {
+    metric: SimilarityMetric = "cosine",
+  ): Promise<ReadonlyArray<SimilarResult>> {
     // TODO: Implement semantic similarity search with pgvector
-    // This will require the full object reconstruction logic
+    // This will require the full object reconstruction logic and proper
+    // distance/similarity calculations based on the specified metric
     console.log("findSimilar called with:", {
       embedding: embedding.dimensions,
       threshold,
       tenantId,
       limit,
+      metric,
     });
     return []; // Placeholder
   }
