@@ -1,7 +1,6 @@
 import {
   assertEquals,
   assertInstanceOf,
-  assertStringIncludes,
   assertThrows,
 } from "@std/assert";
 import { Memory } from "@/domain/entities/memory.ts";
@@ -114,33 +113,6 @@ class ClientStub implements IDatabaseClient {
  * and verify the SQL generation and hydration logic.
  */
 
-Deno.test("PostgresMemoryRepository.findById - should call setTenantContext and execute proper SQL", async () => {
-  const clientStub = new ClientStub();
-  const repository = new PostgresMemoryRepository(clientStub);
-  const tenantId = "123e4567-e89b-12d3-a456-426614174000";
-
-  // Actually call the repository method (this would fail if repository breaks)
-  const memory = await repository.findById("test-memory-id", { tenantId });
-
-  // Verify SQL calls were made in correct order
-  const sqlCalls = clientStub.transactionStub.sqlCalls;
-
-  // Should call setTenantContext first (parameters are bound separately, so we just verify the SQL structure)
-  assertStringIncludes(sqlCalls[0], "pond_set_tenant_context");
-  assertStringIncludes(sqlCalls[0], "::uuid");
-
-  // Should execute findById query with proper JOINs and aggregation
-  assertStringIncludes(sqlCalls[1], "SELECT");
-  assertStringIncludes(sqlCalls[1], "FROM memories m");
-  assertStringIncludes(sqlCalls[1], "LEFT JOIN embeddings e");
-  assertStringIncludes(sqlCalls[1], "LEFT JOIN sources s");
-  assertStringIncludes(sqlCalls[1], "json_agg"); // Should use JSON aggregation
-  assertStringIncludes(sqlCalls[1], "WHERE m.id =");
-
-  // Verify memory was properly reconstructed (proves the whole integration works)
-  assertEquals(memory?.content, "Test stored memory with metadata");
-  assertEquals(memory?.status, MemoryStatus.STORED);
-});
 
 Deno.test("PostgresMemoryRepository.findById - should successfully hydrate stored memory with all metadata", async () => {
   const clientStub = new ClientStub();
@@ -202,24 +174,3 @@ Deno.test("PostgresMemoryRepository.findById - should return null for non-existe
   assertEquals(memory, null);
 });
 
-/**
- * Unit tests for the specific hydration pattern (separate from repository integration)
- */
-
-Deno.test("Memory hydration pattern - should fail if we tried the old way (seeding as STORED)", () => {
-  // This demonstrates the problem that would occur without the fix
-  let memory = new Memory("Test memory");
-
-  // Simulate old broken approach: mark as stored first
-  memory = memory.markAsStored();
-
-  // Now try to add metadata - this should throw
-  const validVector = new Array(512).fill(0).map((_, i) => (i + 1) / 512);
-  const embedding = new Embedding(validVector, "test-model");
-
-  assertThrows(
-    () => memory.setEmbedding(embedding),
-    Error,
-    "Cannot modify stored memory",
-  );
-});

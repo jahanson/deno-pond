@@ -201,6 +201,24 @@ Deno.test("Memory - should prevent source modification after being stored", () =
   );
 });
 
+Deno.test("Memory - should fail when trying to modify stored memory (hydration pattern test)", () => {
+  // This demonstrates the problem that would occur without the hydration fix
+  let memory = new Memory("Test memory");
+
+  // Simulate old broken approach: mark as stored first
+  memory = memory.markAsStored();
+
+  // Now try to add metadata - this should throw
+  const validVector = new Array(512).fill(0).map((_, i) => (i + 1) / 512);
+  const embedding = new Embedding(validVector, "test-model");
+
+  assertThrows(
+    () => memory.setEmbedding(embedding),
+    Error,
+    "Cannot modify stored memory",
+  );
+});
+
 // Complete Memory Integration
 Deno.test("Memory - should maintain embedding and source through state transitions", () => {
   const embedding = new Embedding(new Array(768).fill(0.3), "nomic-embed-text");
