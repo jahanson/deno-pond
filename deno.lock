@@ -3,6 +3,8 @@
   "specifiers": {
     "jsr:@db/postgres@*": "0.19.5",
     "jsr:@db/postgres@~0.19.5": "0.19.5",
+    "jsr:@logtape/logtape@^1.1.0": "1.1.0",
+    "jsr:@logtape/pretty@^1.1.0": "1.1.0",
     "jsr:@std/assert@*": "1.0.14",
     "jsr:@std/assert@^1.0.13": "1.0.14",
     "jsr:@std/assert@^1.0.14": "1.0.14",
@@ -29,6 +31,15 @@
         "jsr:@std/encoding",
         "jsr:@std/fmt",
         "jsr:@std/path@^1.0.8"
+      ]
+    },
+    "@logtape/logtape@1.1.0": {
+      "integrity": "c3e4dbaa684e7c4e3b7f4cb7a376d6ef4ec2f12e185ce6591346d501437899e0"
+    },
+    "@logtape/pretty@1.1.0": {
+      "integrity": "6f4e237dd4bbc1fcd7528395b30b0c7797a88ffe1705f09ce5489559016f38de",
+      "dependencies": [
+        "jsr:@logtape/logtape"
       ]
     },
     "@std/assert@1.0.14": {
@@ -86,6 +97,8 @@
   "workspace": {
     "dependencies": [
       "jsr:@db/postgres@~0.19.5",
+      "jsr:@logtape/logtape@^1.1.0",
+      "jsr:@logtape/pretty@^1.1.0",
       "jsr:@std/assert@^1.0.14",
       "jsr:@std/fs@^1.0.19",
       "jsr:@std/testing@^1.0.15"
