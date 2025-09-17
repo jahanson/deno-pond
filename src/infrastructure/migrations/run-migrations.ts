@@ -59,8 +59,9 @@ async function testNormalMigrations() {
     const migrations = await client.queryObject`
       SELECT version, name FROM schema_migrations ORDER BY version
     `;
-    testLogger.info`📋 Final recorded migrations: ${JSON.stringify(migrations.rows)
-      }`;
+    testLogger.info`📋 Final recorded migrations: ${
+      JSON.stringify(migrations.rows)
+    }`;
   });
 }
 

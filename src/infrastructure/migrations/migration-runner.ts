@@ -1,7 +1,10 @@
 import { Client } from "@db/postgres";
 import { walk } from "@std/fs/walk";
 import { getLogger } from "@logtape/logtape";
-import { configurePondLogging, displayStartupBanner } from "../logging/config.ts";
+import {
+  configurePondLogging,
+  displayStartupBanner,
+} from "../logging/config.ts";
 
 /**
  * Represents a database schema migration.
@@ -110,21 +113,29 @@ export class MigrationRunner {
 
       const executedVersions = new Set(result.rows.map((row) => row.version));
 
-      this.logger.info`📋 Found ${executedVersions.size} previously executed migrations`;
+      this.logger
+        .info`📋 Found ${executedVersions.size} previously executed migrations`;
 
       // Run pending migrations (create sorted copy to avoid mutating input array)
-      const sortedMigrations = [...migrations].sort((a, b) => a.version - b.version);
-      const pendingMigrations = sortedMigrations.filter(m => !executedVersions.has(m.version));
+      const sortedMigrations = [...migrations].sort((a, b) =>
+        a.version - b.version
+      );
+      const pendingMigrations = sortedMigrations.filter((m) =>
+        !executedVersions.has(m.version)
+      );
 
-      this.logger.info`🚀 Planning to execute ${pendingMigrations.length} pending migrations`;
+      this.logger
+        .info`🚀 Planning to execute ${pendingMigrations.length} pending migrations`;
 
       for (const migration of sortedMigrations) {
         if (executedVersions.has(migration.version)) {
-          this.logger.debug`⏭️  Migration ${migration.version} (${migration.name}) already executed - skipping`;
+          this.logger
+            .debug`⏭️  Migration ${migration.version} (${migration.name}) already executed - skipping`;
           continue;
         }
 
-        this.logger.info`🔧 Running migration ${migration.version}: ${migration.name}`;
+        this.logger
+          .info`🔧 Running migration ${migration.version}: ${migration.name}`;
 
         const transaction = this.client.createTransaction(
           `migration_${migration.version}`,
@@ -134,7 +145,8 @@ export class MigrationRunner {
         let transactionCommitted = false;
 
         try {
-          this.logger.debug`⚡ Starting transaction for migration ${migration.version}`;
+          this.logger
+            .debug`⚡ Starting transaction for migration ${migration.version}`;
           await transaction.begin();
           transactionStarted = true;
 
@@ -146,7 +158,8 @@ export class MigrationRunner {
           // Execute migration SQL - THIS IS WHERE THE MAGIC (AND ERRORS) HAPPEN!
           await transaction.queryArray(migration.sql);
 
-          this.logger.debug`📊 Recording successful execution in schema_migrations table`;
+          this.logger
+            .debug`📊 Recording successful execution in schema_migrations table`;
 
           // Record successful execution
           await transaction.queryArray`
@@ -158,27 +171,33 @@ export class MigrationRunner {
           await transaction.commit();
           transactionCommitted = true;
 
-          this.logger.info`✅ Migration ${migration.version} completed successfully! 🎉`;
+          this.logger
+            .info`✅ Migration ${migration.version} completed successfully! 🎉`;
 
           // Update our local set to avoid redundant checks
           executedVersions.add(migration.version);
         } catch (error) {
           // Only rollback if transaction was started and not yet committed
           if (transactionStarted && !transactionCommitted) {
-            this.logger.warning`🔄 Rolling back transaction for migration ${migration.version}...`;
+            this.logger
+              .warning`🔄 Rolling back transaction for migration ${migration.version}...`;
             try {
               await transaction.rollback();
               this.logger.debug`✅ Transaction rollback successful`;
             } catch (rollbackError) {
-              this.logger.error`🚨 CRITICAL: Failed to rollback transaction: ${rollbackError}`;
+              this.logger
+                .error`🚨 CRITICAL: Failed to rollback transaction: ${rollbackError}`;
             }
           }
 
-          this.logger.error`💥 Migration ${migration.version} failed with error: ${error.message}`;
+          this.logger
+            .error`💥 Migration ${migration.version} failed with error: ${error.message}`;
           this.logger.debug`🔍 Full error details:`, error;
 
           // Log SQL that caused the failure for better debugging
-          this.logger.error`🔧 Failed SQL was: ${migration.sql.substring(0, 200).replace(/\n/g, ' ').trim()}${migration.sql.length > 200 ? '...' : ''}`;
+          this.logger.error`🔧 Failed SQL was: ${
+            migration.sql.substring(0, 200).replace(/\n/g, " ").trim()
+          }${migration.sql.length > 200 ? "..." : ""}`;
 
           throw error;
         }
@@ -231,7 +250,8 @@ export class MigrationRunner {
         // Parse filename for version and name
         const match = filename.match(/^(\d+)_(.+?)(?:\.(up|down))?\.sql$/);
         if (!match) {
-          this.logger.warning`⚠️  Skipping file ${filename}: does not match naming convention {version}_{name}.sql`;
+          this.logger
+            .warning`⚠️  Skipping file ${filename}: does not match naming convention {version}_{name}.sql`;
           continue;
         }
 
@@ -276,11 +296,15 @@ export class MigrationRunner {
       }
 
       const sortedResult = result.sort((a, b) => a.version - b.version);
-      this.logger.info`🔍 Successfully discovered ${sortedResult.length} migrations: ${sortedResult.map(m => `v${m.version}`).join(', ')}`;
+      this.logger
+        .info`🔍 Successfully discovered ${sortedResult.length} migrations: ${
+        sortedResult.map((m) => `v${m.version}`).join(", ")
+      }`;
 
       return sortedResult;
     } catch (error) {
-      this.logger.error`💥 Failed to discover migrations from ${directoryPath}: ${error}`;
+      this.logger
+        .error`💥 Failed to discover migrations from ${directoryPath}: ${error}`;
       throw new Error(
         `Failed to discover migrations from ${directoryPath}: ${error}`,
       );
@@ -330,10 +354,12 @@ export class MigrationRunner {
    * @param directoryPath - Path to directory containing migration files
    */
   async runMigrationsFromDirectory(directoryPath: string): Promise<void> {
-    this.logger.info`🚀 Starting migration execution from directory: ${directoryPath}`;
+    this.logger
+      .info`🚀 Starting migration execution from directory: ${directoryPath}`;
 
     const migrations = await this.discoverMigrations(directoryPath);
-    this.logger.info`📊 Loaded ${migrations.length} migration(s), preparing to execute...`;
+    this.logger
+      .info`📊 Loaded ${migrations.length} migration(s), preparing to execute...`;
 
     await this.runMigrations(migrations);
 
@@ -363,7 +389,8 @@ export class MigrationRunner {
     // Acquire advisory lock to prevent concurrent operations
     const MIGRATION_LOCK_ID = 1000001;
 
-    this.logger.info`🔒 Acquiring migration lock for rollback (ID: ${MIGRATION_LOCK_ID})...`;
+    this.logger
+      .info`🔒 Acquiring migration lock for rollback (ID: ${MIGRATION_LOCK_ID})...`;
     await this.client
       .queryObject`SELECT pg_advisory_lock(${MIGRATION_LOCK_ID})`;
 
@@ -380,11 +407,13 @@ export class MigrationRunner {
       `;
 
       if (result.rows.length === 0) {
-        this.logger.info`✅ No migrations to rollback. Current version is already at or below ${targetVersion}`;
+        this.logger
+          .info`✅ No migrations to rollback. Current version is already at or below ${targetVersion}`;
         return;
       }
 
-      this.logger.info`🔄 Rolling back ${result.rows.length} migration(s) to version ${targetVersion}`;
+      this.logger
+        .info`🔄 Rolling back ${result.rows.length} migration(s) to version ${targetVersion}`;
 
       // Create migration lookup for downSql
       const migrationMap = new Map(
@@ -417,7 +446,8 @@ export class MigrationRunner {
         let transactionCommitted = false;
 
         try {
-          this.logger.debug`⚡ Starting rollback transaction for migration ${version}`;
+          this.logger
+            .debug`⚡ Starting rollback transaction for migration ${version}`;
           await transaction.begin();
           transactionStarted = true;
 
@@ -425,7 +455,8 @@ export class MigrationRunner {
           // Execute down migration SQL
           await transaction.queryArray(migration.downSql);
 
-          this.logger.debug`🗑️  Removing migration record from schema_migrations`;
+          this.logger
+            .debug`🗑️  Removing migration record from schema_migrations`;
           // Remove from tracking table
           await transaction.queryArray`
             DELETE FROM schema_migrations WHERE version = ${version}
@@ -434,18 +465,22 @@ export class MigrationRunner {
           await transaction.commit();
           transactionCommitted = true;
 
-          this.logger.info`✅ Migration ${version} rolled back successfully! 🎉`;
+          this.logger
+            .info`✅ Migration ${version} rolled back successfully! 🎉`;
         } catch (error) {
           if (transactionStarted && !transactionCommitted) {
-            this.logger.warning`🔄 Rolling back transaction for failed rollback...`;
+            this.logger
+              .warning`🔄 Rolling back transaction for failed rollback...`;
             await transaction.rollback();
           }
-          this.logger.error`💥 Rollback of migration ${version} failed: ${error.message}`;
+          this.logger
+            .error`💥 Rollback of migration ${version} failed: ${error.message}`;
           throw error;
         }
       }
 
-      this.logger.info`🎉 Rollback completed successfully! Database is now at version ${targetVersion}`;
+      this.logger
+        .info`🎉 Rollback completed successfully! Database is now at version ${targetVersion}`;
     } finally {
       // Always release the advisory lock
       this.logger.debug`🔓 Releasing rollback migration lock`;
