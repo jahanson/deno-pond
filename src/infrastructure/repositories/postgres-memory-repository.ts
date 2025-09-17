@@ -12,7 +12,10 @@ import {
   SimilarityMetric,
   SimilarResult,
 } from "./memory-repository.interface.ts";
-import { IDatabaseClient, IDatabaseTransaction } from "../database/database-client.interface.ts";
+import {
+  IDatabaseClient,
+  IDatabaseTransaction,
+} from "../database/database-client.interface.ts";
 
 /**
  * PostgreSQL implementation of the MemoryRepository interface.

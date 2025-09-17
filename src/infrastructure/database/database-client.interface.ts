@@ -14,7 +14,10 @@ export interface IDatabaseClient {
    * @param args - Optional query parameters
    * @returns Promise resolving to query result with typed rows
    */
-  queryObject<T>(sql: TemplateStringsArray | string, ...args: unknown[]): Promise<{ rows: T[] }>;
+  queryObject<T>(
+    sql: TemplateStringsArray | string,
+    ...args: unknown[]
+  ): Promise<{ rows: T[] }>;
 
   /**
    * Execute a parameterized query optimized for simple operations.
@@ -23,7 +26,10 @@ export interface IDatabaseClient {
    * @param args - Optional query parameters
    * @returns Promise resolving to query result with row count (may be undefined)
    */
-  queryArray(sql: TemplateStringsArray | string, ...args: unknown[]): Promise<{ rowCount?: number }>;
+  queryArray(
+    sql: TemplateStringsArray | string,
+    ...args: unknown[]
+  ): Promise<{ rowCount?: number }>;
 
   /**
    * Create a new database transaction for atomic operations.
@@ -44,12 +50,18 @@ export interface IDatabaseTransaction {
   /**
    * Execute a parameterized query that returns structured row data.
    */
-  queryObject<T>(sql: TemplateStringsArray | string, ...args: unknown[]): Promise<{ rows: T[] }>;
+  queryObject<T>(
+    sql: TemplateStringsArray | string,
+    ...args: unknown[]
+  ): Promise<{ rows: T[] }>;
 
   /**
    * Execute a parameterized query optimized for simple operations.
    */
-  queryArray(sql: TemplateStringsArray | string, ...args: unknown[]): Promise<{ rowCount?: number }>;
+  queryArray(
+    sql: TemplateStringsArray | string,
+    ...args: unknown[]
+  ): Promise<{ rowCount?: number }>;
 
   /**
    * Start the transaction.

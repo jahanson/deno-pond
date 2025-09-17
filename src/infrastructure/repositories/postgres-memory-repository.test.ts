@@ -1,14 +1,12 @@
-import {
-  assertEquals,
-  assertInstanceOf,
-  assertThrows,
-} from "@std/assert";
-import { Memory } from "@/domain/entities/memory.ts";
+import { assertEquals, assertInstanceOf } from "@std/assert";
 import { Embedding } from "@/domain/entities/embedding.ts";
 import { Source } from "@/domain/entities/source.ts";
 import { MemoryStatus, SourceType } from "@/domain/shared/types.ts";
 import { PostgresMemoryRepository } from "./postgres-memory-repository.ts";
-import { IDatabaseClient, IDatabaseTransaction } from "../database/database-client.interface.ts";
+import {
+  IDatabaseClient,
+  IDatabaseTransaction,
+} from "../database/database-client.interface.ts";
 
 /**
  * Transaction stub for testing PostgresMemoryRepository integration.
@@ -60,7 +58,10 @@ class TransactionStub implements IDatabaseTransaction {
     return Promise.resolve({ rowCount: 1 });
   }
 
-  queryObject<T>(sql: TemplateStringsArray | string, ..._args: unknown[]): Promise<{ rows: T[] }> {
+  queryObject<T>(
+    sql: TemplateStringsArray | string,
+    ..._args: unknown[]
+  ): Promise<{ rows: T[] }> {
     this.sqlCalls.push(sql.toString());
 
     // Mock the complex findById query with aggregated JSON
@@ -99,7 +100,10 @@ class ClientStub implements IDatabaseClient {
     return this.transactionStub.queryArray(sql, ..._args);
   }
 
-  queryObject<T>(sql: TemplateStringsArray | string, ..._args: unknown[]): Promise<{ rows: T[] }> {
+  queryObject<T>(
+    sql: TemplateStringsArray | string,
+    ..._args: unknown[]
+  ): Promise<{ rows: T[] }> {
     return this.transactionStub.queryObject(sql, ..._args);
   }
 
@@ -112,7 +116,6 @@ class ClientStub implements IDatabaseClient {
  * Integration tests that actually call PostgresMemoryRepository methods
  * and verify the SQL generation and hydration logic.
  */
-
 
 Deno.test("PostgresMemoryRepository.findById - should successfully hydrate stored memory with all metadata", async () => {
   const clientStub = new ClientStub();
@@ -173,4 +176,3 @@ Deno.test("PostgresMemoryRepository.findById - should return null for non-existe
 
   assertEquals(memory, null);
 });
-
