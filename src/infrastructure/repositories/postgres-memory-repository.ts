@@ -5,12 +5,13 @@ import { Source } from "@/domain/entities/source.ts";
 import { Tag } from "@/domain/entities/tag.ts";
 import { Entity } from "@/domain/entities/entity.ts";
 import { Action } from "@/domain/entities/action.ts";
+import { MemoryStatus } from "@/domain/shared/types.ts";
 import {
   MemoryRepository,
+  QueryOptions,
+  SaveOptions,
   SimilarityMetric,
   SimilarResult,
-  SaveOptions,
-  QueryOptions,
 } from "./memory-repository.interface.ts";
 
 /**
@@ -46,8 +47,12 @@ export class PostgresMemoryRepository implements MemoryRepository {
    * Sets the tenant context for RLS enforcement.
    * Must be called before any data operations to ensure proper tenant isolation.
    */
-  private async setTenantContext(tenantId: string, executor: Client | Transaction): Promise<void> {
-    await executor.queryArray`SELECT pond_set_tenant_context(${tenantId}::uuid)`;
+  private async setTenantContext(
+    tenantId: string,
+    executor: Client | Transaction,
+  ): Promise<void> {
+    await executor
+      .queryArray`SELECT pond_set_tenant_context(${tenantId}::uuid)`;
   }
 
   async save(memory: Memory, options: SaveOptions): Promise<void> {
@@ -57,14 +62,14 @@ export class PostgresMemoryRepository implements MemoryRepository {
       // Use provided transaction
       await this.setTenantContext(tenantId, tx);
       return this.performSave(memory, tenantId, tx);
-    } else if ('commit' in this.client && 'rollback' in this.client) {
+    } else if ("commit" in this.client && "rollback" in this.client) {
       // Already in a transaction context
       await this.setTenantContext(tenantId, this.client);
       return this.performSave(memory, tenantId, this.client as Transaction);
     } else {
       // Create new transaction wrapper
       const client = this.client as Client;
-      const transaction = client.createTransaction('memory_save');
+      const transaction = client.createTransaction("memory_save");
       try {
         await transaction.begin();
         await this.setTenantContext(tenantId, transaction);
@@ -77,7 +82,11 @@ export class PostgresMemoryRepository implements MemoryRepository {
     }
   }
 
-  private async performSave(memory: Memory, tenantId: string, tx: Transaction): Promise<void> {
+  private async performSave(
+    memory: Memory,
+    tenantId: string,
+    tx: Transaction,
+  ): Promise<void> {
     // Insert main memory record - RLS will enforce tenant isolation
     const memoryResult = await tx.queryObject<{ id: string }>`
       INSERT INTO memories (tenant_id, content, content_hash, status, created_at)
@@ -97,7 +106,7 @@ export class PostgresMemoryRepository implements MemoryRepository {
     const embedding = memory.getEmbedding();
     if (embedding) {
       // Convert embedding vector to pgvector string format for proper type binding
-      const vectorString = `[${embedding.vector.join(',')}]`;
+      const vectorString = `[${embedding.vector.join(",")}]`;
 
       await tx.queryArray`
         INSERT INTO embeddings (memory_id, vector, dimensions, model)
@@ -120,7 +129,9 @@ export class PostgresMemoryRepository implements MemoryRepository {
     const tags = memory.getTags();
     if (tags.length > 0) {
       // Prepare batch data: array of [memory_id, raw, normalized, slug] for each tag
-      const tagRows = tags.map(tag => [memoryId, tag.raw, tag.normalized, tag.slug]);
+      const tagRows = tags.map(
+        (tag) => [memoryId, tag.raw, tag.normalized, tag.slug],
+      );
 
       // Use unnest() approach for clean batch insert
       await tx.queryArray(
@@ -128,11 +139,11 @@ export class PostgresMemoryRepository implements MemoryRepository {
          SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[], $4::text[])
          ON CONFLICT (memory_id, slug) DO NOTHING`,
         [
-          tagRows.map(row => row[0]), // memory_ids
-          tagRows.map(row => row[1]), // raws
-          tagRows.map(row => row[2]), // normalizeds
-          tagRows.map(row => row[3]), // slugs
-        ]
+          tagRows.map((row) => row[0]), // memory_ids
+          tagRows.map((row) => row[1]), // raws
+          tagRows.map((row) => row[2]), // normalizeds
+          tagRows.map((row) => row[3]), // slugs
+        ],
       );
     }
 
@@ -140,7 +151,9 @@ export class PostgresMemoryRepository implements MemoryRepository {
     const entities = memory.getEntities();
     if (entities.length > 0) {
       // Prepare batch data: array of [memory_id, text, type] for each entity
-      const entityRows = entities.map(entity => [memoryId, entity.text, entity.type]);
+      const entityRows = entities.map(
+        (entity) => [memoryId, entity.text, entity.type],
+      );
 
       // Use unnest() approach for clean batch insert
       await tx.queryArray(
@@ -148,10 +161,10 @@ export class PostgresMemoryRepository implements MemoryRepository {
          SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[])
          ON CONFLICT (memory_id, text, type) DO NOTHING`,
         [
-          entityRows.map(row => row[0]), // memory_ids
-          entityRows.map(row => row[1]), // texts
-          entityRows.map(row => row[2]), // types
-        ]
+          entityRows.map((row) => row[0]), // memory_ids
+          entityRows.map((row) => row[1]), // texts
+          entityRows.map((row) => row[2]), // types
+        ],
       );
     }
 
@@ -159,7 +172,9 @@ export class PostgresMemoryRepository implements MemoryRepository {
     const actions = memory.getActions();
     if (actions.length > 0) {
       // Prepare batch data: array of [memory_id, action, slug] for each action
-      const actionRows = actions.map(action => [memoryId, action.action, action.slug]);
+      const actionRows = actions.map(
+        (action) => [memoryId, action.action, action.slug],
+      );
 
       // Use unnest() approach for clean batch insert
       await tx.queryArray(
@@ -167,10 +182,10 @@ export class PostgresMemoryRepository implements MemoryRepository {
          SELECT * FROM UNNEST($1::uuid[], $2::text[], $3::text[])
          ON CONFLICT (memory_id, slug) DO NOTHING`,
         [
-          actionRows.map(row => row[0]), // memory_ids
-          actionRows.map(row => row[1]), // actions
-          actionRows.map(row => row[2]), // slugs
-        ]
+          actionRows.map((row) => row[0]), // memory_ids
+          actionRows.map((row) => row[1]), // actions
+          actionRows.map((row) => row[2]), // slugs
+        ],
       );
     }
   }
@@ -229,13 +244,14 @@ export class PostgresMemoryRepository implements MemoryRepository {
     if (result.rows.length === 0) return null;
 
     const row = result.rows[0];
+    const persistedStatus = row.status as MemoryStatus;
 
     // Start with base memory - need to reconstruct with proper timestamp
     const memoryWithTimestamp = Object.create(Memory.prototype);
     Object.assign(memoryWithTimestamp, {
       content: row.content,
       contentHash: row.content_hash,
-      status: row.status,
+      status: MemoryStatus.DRAFT,
       createdAt: row.created_at,
       tags: [],
       entities: [],
@@ -247,20 +263,28 @@ export class PostgresMemoryRepository implements MemoryRepository {
     let memory = memoryWithTimestamp as Memory;
 
     // Add embedding if present
-    if (row.embedding_vector && row.embedding_dimensions && row.embedding_model) {
-      const embedding = new Embedding(row.embedding_vector, row.embedding_model);
+    if (
+      row.embedding_vector && row.embedding_dimensions && row.embedding_model
+    ) {
+      const embedding = new Embedding(
+        row.embedding_vector,
+        row.embedding_model,
+      );
       memory = memory.setEmbedding(embedding);
     }
 
     // Add source if present
-    if (row.source_type && row.source_context && row.source_hash && row.source_created_at) {
+    if (
+      row.source_type && row.source_context && row.source_hash &&
+      row.source_created_at
+    ) {
       // Create source with preserved timestamp from database
       const sourceWithTimestamp = Object.create(Source.prototype);
       Object.assign(sourceWithTimestamp, {
         type: row.source_type,
         context: row.source_context,
         hash: row.source_hash,
-        createdAt: row.source_created_at,
+        _createdAt: row.source_created_at,
       });
       memory = memory.setSource(sourceWithTimestamp as Source);
     }
@@ -283,8 +307,11 @@ export class PostgresMemoryRepository implements MemoryRepository {
       memory = memory.addAction(action);
     }
 
-    // Mark as stored since it came from database
-    return memory.markAsStored();
+    if (persistedStatus === MemoryStatus.STORED) {
+      return memory.markAsStored();
+    }
+
+    return memory;
   }
 
   async findByContentHash(
@@ -316,7 +343,7 @@ export class PostgresMemoryRepository implements MemoryRepository {
     // Set tenant context for RLS enforcement
     await this.setTenantContext(tenantId, this.client);
     // Convert embedding vector to pgvector string format for proper type binding
-    const vectorString = `[${embedding.vector.join(',')}]`;
+    const vectorString = `[${embedding.vector.join(",")}]`;
 
     // Core pattern: ORDER BY e.vector <=> $query ASC with WHERE e.vector <=> $query <= 1 - $threshold
     // This enables optimal index usage with direct operator in ORDER BY
