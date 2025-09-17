@@ -1,5 +1,7 @@
 import { Client } from "@db/postgres";
 import { walk } from "@std/fs/walk";
+import { getLogger } from "@logtape/logtape";
+import { configurePondLogging, displayStartupBanner } from "../logging/config.ts";
 
 /**
  * Represents a database schema migration.
@@ -60,14 +62,20 @@ export interface Migration {
  *   ```
  */
 export class MigrationRunner {
+  private readonly logger = getLogger(["deno-pond", "migration"]);
+
   /**
    * Creates a new migration runner.
    *
    * @param client - Connected PostgreSQL client for executing migrations
    */
-  constructor(private client: Client) {}
+  constructor(private client: Client) {
+    this.logger.debug`🔧 MigrationRunner initialized with MAXIMUM RICE!`;
+  }
 
   async initialize(): Promise<void> {
+    this.logger.debug`🏗️  Initializing migration tracking table...`;
+
     // Create migrations tracking table if it doesn't exist
     await this.client.queryArray`
       CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -76,6 +84,8 @@ export class MigrationRunner {
         executed_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `;
+
+    this.logger.info`✅ Migration tracking table ready`;
   }
 
   async runMigrations(migrations: Migration[]): Promise<void> {
@@ -85,13 +95,13 @@ export class MigrationRunner {
     // Use a consistent lock ID for migration operations
     const MIGRATION_LOCK_ID = 1000001;
 
-    console.log("Acquiring migration lock...");
+    this.logger.info`🔒 Acquiring migration lock (ID: ${MIGRATION_LOCK_ID})...`;
     await this.client.queryObject<{ pg_advisory_lock: boolean }>`
       SELECT pg_advisory_lock(${MIGRATION_LOCK_ID}) as pg_advisory_lock
     `;
 
     try {
-      console.log("Migration lock acquired");
+      this.logger.debug`✅ Migration lock acquired successfully`;
 
       // Re-check executed migrations inside the lock to handle concurrent starts
       const result = await this.client.queryObject<{ version: number }>`
@@ -100,30 +110,39 @@ export class MigrationRunner {
 
       const executedVersions = new Set(result.rows.map((row) => row.version));
 
+      this.logger.info`📋 Found ${executedVersions.size} previously executed migrations`;
+
       // Run pending migrations (create sorted copy to avoid mutating input array)
-      for (
-        const migration of [...migrations].sort((a, b) => a.version - b.version)
-      ) {
+      const sortedMigrations = [...migrations].sort((a, b) => a.version - b.version);
+      const pendingMigrations = sortedMigrations.filter(m => !executedVersions.has(m.version));
+
+      this.logger.info`🚀 Planning to execute ${pendingMigrations.length} pending migrations`;
+
+      for (const migration of sortedMigrations) {
         if (executedVersions.has(migration.version)) {
-          console.log(
-            `Migration ${migration.version} (${migration.name}) already executed`,
-          );
+          this.logger.debug`⏭️  Migration ${migration.version} (${migration.name}) already executed - skipping`;
           continue;
         }
 
-        console.log(
-          `Running migration ${migration.version}: ${migration.name}`,
-        );
+        this.logger.info`🔧 Running migration ${migration.version}: ${migration.name}`;
 
         const transaction = this.client.createTransaction(
           `migration_${migration.version}`,
         );
 
+        let transactionCommitted = false;
+
         try {
+          this.logger.debug`⚡ Starting transaction for migration ${migration.version}`;
           await transaction.begin();
 
-          // Execute migration SQL
+          this.logger.debug`📝 Executing migration SQL...`;
+          this.logger.debug`SQL Preview: ${migration.sql.substring(0, 100).replace(/\n/g, ' ').trim()}${migration.sql.length > 100 ? '...' : ''}`;
+
+          // Execute migration SQL - THIS IS WHERE THE MAGIC (AND ERRORS) HAPPEN!
           await transaction.queryArray(migration.sql);
+
+          this.logger.debug`📊 Recording successful execution in schema_migrations table`;
 
           // Record successful execution
           await transaction.queryArray`
@@ -131,24 +150,41 @@ export class MigrationRunner {
             VALUES (${migration.version}, ${migration.name})
           `;
 
+          this.logger.debug`💾 Committing transaction`;
           await transaction.commit();
-          console.log(
-            `✅ Migration ${migration.version} completed successfully`,
-          );
+          transactionCommitted = true;
+
+          this.logger.info`✅ Migration ${migration.version} completed successfully! 🎉`;
 
           // Update our local set to avoid redundant checks
           executedVersions.add(migration.version);
         } catch (error) {
-          await transaction.rollback();
-          console.error(`❌ Migration ${migration.version} failed:`, error);
+          // Only rollback if transaction hasn't been committed yet
+          if (!transactionCommitted) {
+            this.logger.warning`🔄 Rolling back transaction for migration ${migration.version}...`;
+            try {
+              await transaction.rollback();
+              this.logger.debug`✅ Transaction rollback successful`;
+            } catch (rollbackError) {
+              this.logger.error`🚨 CRITICAL: Failed to rollback transaction: ${rollbackError}`;
+            }
+          }
+
+          this.logger.error`💥 Migration ${migration.version} failed with error: ${error.message}`;
+          this.logger.debug`🔍 Full error details:`, error;
+
+          // Log SQL that caused the failure for better debugging
+          this.logger.error`🔧 Failed SQL was: ${migration.sql.substring(0, 200).replace(/\n/g, ' ').trim()}${migration.sql.length > 200 ? '...' : ''}`;
+
           throw error;
         }
       }
     } finally {
       // Always release the advisory lock
+      this.logger.debug`🔓 Releasing migration lock`;
       await this.client
         .queryObject`SELECT pg_advisory_unlock(${MIGRATION_LOCK_ID})`;
-      console.log("Migration lock released");
+      this.logger.debug`✅ Migration lock released successfully`;
     }
   }
 
@@ -173,6 +209,7 @@ export class MigrationRunner {
    * @returns Array of Migration objects sorted by version
    */
   async discoverMigrations(directoryPath: string): Promise<Migration[]> {
+    this.logger.info`📁 Discovering migrations from ${directoryPath}`;
     const migrations = new Map<number, Partial<Migration>>();
 
     try {
@@ -184,14 +221,13 @@ export class MigrationRunner {
         })
       ) {
         const filename = entry.name;
+        this.logger.debug`📄 Processing migration file: ${filename}`;
         const content = await Deno.readTextFile(entry.path);
 
         // Parse filename for version and name
         const match = filename.match(/^(\d+)_(.+?)(?:\.(up|down))?\.sql$/);
         if (!match) {
-          console.warn(
-            `Skipping file ${filename}: does not match naming convention {version}_{name}.sql`,
-          );
+          this.logger.warning`⚠️  Skipping file ${filename}: does not match naming convention {version}_{name}.sql`;
           continue;
         }
 
@@ -235,8 +271,12 @@ export class MigrationRunner {
         });
       }
 
-      return result.sort((a, b) => a.version - b.version);
+      const sortedResult = result.sort((a, b) => a.version - b.version);
+      this.logger.info`🔍 Successfully discovered ${sortedResult.length} migrations: ${sortedResult.map(m => `v${m.version}`).join(', ')}`;
+
+      return sortedResult;
     } catch (error) {
+      this.logger.error`💥 Failed to discover migrations from ${directoryPath}: ${error}`;
       throw new Error(
         `Failed to discover migrations from ${directoryPath}: ${error}`,
       );
@@ -286,11 +326,14 @@ export class MigrationRunner {
    * @param directoryPath - Path to directory containing migration files
    */
   async runMigrationsFromDirectory(directoryPath: string): Promise<void> {
+    this.logger.info`🚀 Starting migration execution from directory: ${directoryPath}`;
+
     const migrations = await this.discoverMigrations(directoryPath);
-    console.log(
-      `Discovered ${migrations.length} migration(s) from ${directoryPath}`,
-    );
+    this.logger.info`📊 Loaded ${migrations.length} migration(s), preparing to execute...`;
+
     await this.runMigrations(migrations);
+
+    this.logger.info`🎉 All migrations completed successfully!`;
   }
 
   /**
@@ -316,12 +359,12 @@ export class MigrationRunner {
     // Acquire advisory lock to prevent concurrent operations
     const MIGRATION_LOCK_ID = 1000001;
 
-    console.log("Acquiring migration lock for rollback...");
+    this.logger.info`🔒 Acquiring migration lock for rollback (ID: ${MIGRATION_LOCK_ID})...`;
     await this.client
       .queryObject`SELECT pg_advisory_lock(${MIGRATION_LOCK_ID})`;
 
     try {
-      console.log("Migration lock acquired");
+      this.logger.debug`✅ Migration lock acquired for rollback`;
 
       // Get currently executed migrations
       const result = await this.client.queryObject<
@@ -333,15 +376,11 @@ export class MigrationRunner {
       `;
 
       if (result.rows.length === 0) {
-        console.log(
-          `No migrations to rollback. Current version is already at or below ${targetVersion}`,
-        );
+        this.logger.info`✅ No migrations to rollback. Current version is already at or below ${targetVersion}`;
         return;
       }
 
-      console.log(
-        `Rolling back ${result.rows.length} migration(s) to version ${targetVersion}`,
-      );
+      this.logger.info`🔄 Rolling back ${result.rows.length} migration(s) to version ${targetVersion}`;
 
       // Create migration lookup for downSql
       const migrationMap = new Map(
@@ -364,40 +403,43 @@ export class MigrationRunner {
           );
         }
 
-        console.log(`Rolling back migration ${version}: ${name}`);
+        this.logger.info`🔄 Rolling back migration ${version}: ${name}`;
 
         const transaction = this.client.createTransaction(
           `rollback_migration_${version}`,
         );
 
         try {
+          this.logger.debug`⚡ Starting rollback transaction for migration ${version}`;
           await transaction.begin();
 
+          this.logger.debug`📝 Executing rollback SQL...`;
           // Execute down migration SQL
           await transaction.queryArray(migration.downSql);
 
+          this.logger.debug`🗑️  Removing migration record from schema_migrations`;
           // Remove from tracking table
           await transaction.queryArray`
             DELETE FROM schema_migrations WHERE version = ${version}
           `;
 
           await transaction.commit();
-          console.log(`✅ Migration ${version} rolled back successfully`);
+          this.logger.info`✅ Migration ${version} rolled back successfully! 🎉`;
         } catch (error) {
+          this.logger.warning`🔄 Rolling back transaction for failed rollback...`;
           await transaction.rollback();
-          console.error(`❌ Rollback of migration ${version} failed:`, error);
+          this.logger.error`💥 Rollback of migration ${version} failed: ${error.message}`;
           throw error;
         }
       }
 
-      console.log(
-        `🔄 Rollback completed. Database is now at version ${targetVersion}`,
-      );
+      this.logger.info`🎉 Rollback completed successfully! Database is now at version ${targetVersion}`;
     } finally {
       // Always release the advisory lock
+      this.logger.debug`🔓 Releasing rollback migration lock`;
       await this.client
         .queryObject`SELECT pg_advisory_unlock(${MIGRATION_LOCK_ID})`;
-      console.log("Migration lock released");
+      this.logger.debug`✅ Rollback migration lock released successfully`;
     }
   }
 }
