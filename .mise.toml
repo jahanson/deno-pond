@@ -1,6 +1,10 @@
 [env]
 DATABASE_URL = 'op://Private/Supabase Connection Strings/pond_dev'
 CA_CERT_PATH = '.private/prod-ca-2021.crt'
+LOGFIRE_WRITE_TOKEN = 'op://Private/czesn34xkbz7oxnrrjnsct7som/credential'
+OTEL_DENO = 'true'
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT = 'https://logfire-us.pydantic.dev/v1/traces'
+OTEL_EXPORTER_OTLP_LOGS_ENDPOINT = 'https://logfire-us.pydantic.dev/v1/logs'
 
 [tasks.pre-commit]
 description = "Pre-commit checks for code quality"
@@ -63,3 +67,14 @@ run = "op run -- deno run --allow-env --allow-net --allow-read $MISE_PROJECT_ROO
 description = "Drop all tables in the db."
 alias = "nuke"
 run = "op run -- deno run --allow-env --allow-net --allow-read nuke_tables.ts"
+
+[tasks.ts]
+description = "Run TypeScript files with environment injection and default permissions"
+run = "op run -- deno run --allow-net --allow-read --allow-env"
+
+
+[tasks.ts-otel]
+description = "Run TypeScript files with OTEL enabled. This includes logs and traces."
+run = '''
+OTEL_EXPORTER_OTLP_HEADERS="Authorization=$(op read op://Private/czesn34xkbz7oxnrrjnsct7som/credential)" op run -- deno run --allow-net --allow-read --allow-env
+'''

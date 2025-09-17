@@ -23,6 +23,7 @@
 
 import { configure, getConsoleSink } from "@logtape/logtape";
 import { getPrettyFormatter } from "@logtape/pretty";
+import { getOpenTelemetrySink } from "@logtape/otel";
 
 /**
  * 🎨 MAXIMUM RICE FORMATTER - Custom theme that makes r/unixporn weep
@@ -78,29 +79,53 @@ export const riceFormatter = getPrettyFormatter({
 });
 
 /**
- * 🚀 Configure LogTape with MAXIMUM RICE for the entire deno-pond application
+ * 🚀 Configure LogTape with MAXIMUM RICE + Cloud Observability
  *
- * This function sets up the beautiful logging configuration that makes debugging
- * a joy. Call this once at application startup to enable gorgeous logs throughout
- * the entire codebase.
+ * This function sets up dual-sink logging configuration:
+ * - Beautiful MAXIMUM RICE console output for development
+ * - OpenTelemetry sink to Logfire for production observability
+ *
+ * Environment variables:
+ * - LOGFIRE_WRITE_TOKEN: Logfire API token for OpenTelemetry forwarding
  *
  * @param lowestLevel - Minimum log level to capture (default: "debug" for full rice)
  */
 export async function configurePondLogging(
   lowestLevel: "debug" | "info" | "warning" | "error" | "fatal" = "debug",
 ): Promise<void> {
+  // Always include beautiful MAXIMUM RICE console sink
+  const sinks: Record<string, any> = {
+    console: getConsoleSink({
+      formatter: riceFormatter,
+    }),
+  };
+
+  // Add Logfire OTEL sink if token is available
+  const logfireToken = Deno.env.get("LOGFIRE_WRITE_TOKEN");
+  if (logfireToken) {
+    sinks.logfire = getOpenTelemetrySink({
+      serviceName: "deno-pond",
+      otlpExporterConfig: {
+        url: "https://logfire-us.pydantic.dev/v1/logs",
+        //        headers: {
+        //          "Authorization": `${logfireToken}`,
+        //          "Content-Type": "application/json",
+        //        },
+      },
+    });
+  }
+
+  // Determine active sinks
+  const activeSinks = logfireToken ? ["console", "logfire"] : ["console"];
+
   await configure({
-    sinks: {
-      console: getConsoleSink({
-        formatter: riceFormatter,
-      }),
-    },
+    sinks,
     loggers: [
-      // Capture everything from deno-pond with our beautiful formatting
-      { category: ["deno-pond"], lowestLevel, sinks: ["console"] },
+      // Capture everything from deno-pond with dual sinks
+      { category: ["deno-pond"], lowestLevel, sinks: activeSinks },
 
       // Also capture root level logs at info+ to avoid spam but keep important stuff
-      { category: [], lowestLevel: "info", sinks: ["console"] },
+      { category: [], lowestLevel: "info", sinks: activeSinks },
     ],
   });
 }
@@ -132,6 +157,7 @@ export const ASCII_HEADERS = {
 ║  📊 Structured data logging with perfect formatting                        ║
 ║  🔤 Template literal interpolation with syntax highlighting                ║
 ║  ⚡ Zero dependencies, TypeScript native, pure performance                 ║
+║  🌩️  Dual-sink architecture: Console + Logfire OpenTelemetry              ║
 ║  🐛 PERFECT for debugging database migrations with STYLE!                  ║
 ╚════════════════════════════════════════════════════════════════════════════╝`,
 
@@ -139,6 +165,7 @@ export const ASCII_HEADERS = {
     🔥 MAXIMUM RICE MODE ACTIVATED 🔥
     💻 Aesthetic Level: r/unixporn Hall of Fame 💻
     🏆 This logging setup would make r/unixporn WEEP with joy! 🏆
+    🌩️  Dual-sink observability: Console + Logfire OTEL 🌩️
     💫 Ready to debug in MAXIMUM AESTHETIC! 💫`,
 } as const;
 
@@ -160,4 +187,27 @@ export function displayStartupBanner(moduleName: string): void {
  */
 export function displayRiceAchievement(): void {
   console.log(`\n${ASCII_HEADERS.RICE_ACTIVATED}\n`);
+}
+
+/**
+ * 📊 Display current logging configuration status
+ * Shows which sinks are active and their targets
+ */
+export function displayLoggingStatus(): void {
+  const logfireToken = Deno.env.get("LOGFIRE_WRITE_TOKEN");
+
+  console.log("\n🌟 LOGGING CONFIGURATION STATUS 🌟");
+  console.log("╔════════════════════════════════════════╗");
+  console.log("║  📺 Console Sink: ✅ ACTIVE (MAXIMUM RICE)  ║");
+
+  if (logfireToken) {
+    console.log("║  🌩️  Logfire OTEL: ✅ ACTIVE               ║");
+    console.log("║     📡 Endpoint: logfire-api.pydantic.dev ║");
+    console.log("║     🔑 Token: [CONFIGURED]                ║");
+  } else {
+    console.log("║  🌩️  Logfire OTEL: ❌ INACTIVE             ║");
+    console.log("║     💡 Set LOGFIRE_WRITE_TOKEN to enable  ║");
+  }
+
+  console.log("╚════════════════════════════════════════╝\n");
 }
