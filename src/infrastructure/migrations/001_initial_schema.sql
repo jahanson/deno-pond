@@ -4,11 +4,20 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS "vector"; -- pgvector for embeddings
 
 -- Custom types
-CREATE TYPE memory_status AS ENUM ('DRAFT', 'STORED');
-CREATE TYPE source_type AS ENUM ('claude-code', 'manual', 'import', 'api');
+DO $$ BEGIN
+    CREATE TYPE memory_status AS ENUM ('DRAFT', 'STORED');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+DO $$ BEGIN
+    CREATE TYPE source_type AS ENUM ('claude-code', 'manual', 'import', 'api');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 -- Main memories table (aggregate root)
-CREATE TABLE memories (
+CREATE TABLE IF NOT EXISTS memories (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID NOT NULL,
     content TEXT NOT NULL CHECK (length(trim(content)) > 0 AND length(content) <= 7500),
@@ -23,7 +32,7 @@ CREATE TABLE memories (
 );
 
 -- Embeddings table (semantic vectors)
-CREATE TABLE embeddings (
+CREATE TABLE IF NOT EXISTS embeddings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     memory_id UUID NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
     vector vector(1536) NOT NULL, -- Default to OpenAI dimensions, adjust as needed
@@ -37,7 +46,7 @@ CREATE TABLE embeddings (
 );
 
 -- Sources table (provenance tracking)
-CREATE TABLE sources (
+CREATE TABLE IF NOT EXISTS sources (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     memory_id UUID NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
     type source_type NOT NULL,
@@ -52,7 +61,7 @@ CREATE TABLE sources (
 );
 
 -- Tags table
-CREATE TABLE tags (
+CREATE TABLE IF NOT EXISTS tags (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     memory_id UUID NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
     raw TEXT NOT NULL,
@@ -65,7 +74,7 @@ CREATE TABLE tags (
 );
 
 -- Entities table (NLP extracted entities)
-CREATE TABLE entities (
+CREATE TABLE IF NOT EXISTS entities (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     memory_id UUID NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
     text TEXT NOT NULL,
@@ -78,7 +87,7 @@ CREATE TABLE entities (
 );
 
 -- Actions table (NLP extracted actions)
-CREATE TABLE actions (
+CREATE TABLE IF NOT EXISTS actions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     memory_id UUID NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
     action TEXT NOT NULL,
@@ -92,38 +101,38 @@ CREATE TABLE actions (
 -- Indexes for performance
 
 -- Tenant isolation (most important)
-CREATE INDEX idx_memories_tenant_id ON memories (tenant_id);
-CREATE INDEX idx_memories_tenant_created_at ON memories (tenant_id, created_at DESC);
-CREATE INDEX idx_memories_tenant_status ON memories (tenant_id, status);
+CREATE INDEX IF NOT EXISTS idx_memories_tenant_id ON memories (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_memories_tenant_created_at ON memories (tenant_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memories_tenant_status ON memories (tenant_id, status);
 
 -- Content deduplication
-CREATE INDEX idx_memories_content_hash ON memories (content_hash);
-CREATE UNIQUE INDEX idx_memories_tenant_content_hash ON memories (tenant_id, content_hash);
+CREATE INDEX IF NOT EXISTS idx_memories_content_hash ON memories (content_hash);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_memories_tenant_content_hash ON memories (tenant_id, content_hash);
 
 -- Full-text search
-CREATE INDEX idx_memories_content_fts ON memories USING gin (to_tsvector('english', content));
+CREATE INDEX IF NOT EXISTS idx_memories_content_fts ON memories USING gin (to_tsvector('english', content));
 
 -- Embedding similarity search (requires pgvector)
-CREATE INDEX idx_embeddings_vector_cosine ON embeddings USING ivfflat (vector vector_cosine_ops) WITH (lists = 100);
-CREATE INDEX idx_embeddings_vector_l2 ON embeddings USING ivfflat (vector vector_l2_ops) WITH (lists = 100);
+CREATE INDEX IF NOT EXISTS idx_embeddings_vector_cosine ON embeddings USING ivfflat (vector vector_cosine_ops) WITH (lists = 100);
+CREATE INDEX IF NOT EXISTS idx_embeddings_vector_l2 ON embeddings USING ivfflat (vector vector_l2_ops) WITH (lists = 100);
 
 -- Source lookups
-CREATE INDEX idx_sources_hash ON sources (hash);
-CREATE INDEX idx_sources_type ON sources (type);
+CREATE INDEX IF NOT EXISTS idx_sources_hash ON sources (hash);
+CREATE INDEX IF NOT EXISTS idx_sources_type ON sources (type);
 
 -- Tag searches
-CREATE INDEX idx_tags_memory_id ON tags (memory_id);
-CREATE INDEX idx_tags_normalized ON tags (normalized);
-CREATE INDEX idx_tags_slug ON tags (slug);
+CREATE INDEX IF NOT EXISTS idx_tags_memory_id ON tags (memory_id);
+CREATE INDEX IF NOT EXISTS idx_tags_normalized ON tags (normalized);
+CREATE INDEX IF NOT EXISTS idx_tags_slug ON tags (slug);
 
 -- Entity searches
-CREATE INDEX idx_entities_memory_id ON entities (memory_id);
-CREATE INDEX idx_entities_type ON entities (type);
-CREATE INDEX idx_entities_text ON entities (text);
+CREATE INDEX IF NOT EXISTS idx_entities_memory_id ON entities (memory_id);
+CREATE INDEX IF NOT EXISTS idx_entities_type ON entities (type);
+CREATE INDEX IF NOT EXISTS idx_entities_text ON entities (text);
 
 -- Action searches
-CREATE INDEX idx_actions_memory_id ON actions (memory_id);
-CREATE INDEX idx_actions_slug ON actions (slug);
+CREATE INDEX IF NOT EXISTS idx_actions_memory_id ON actions (memory_id);
+CREATE INDEX IF NOT EXISTS idx_actions_slug ON actions (slug);
 
 -- Triggers for updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -149,26 +158,32 @@ ALTER TABLE actions ENABLE ROW LEVEL SECURITY;
 
 -- Basic RLS policies (will be enhanced with proper tenant context)
 CREATE POLICY memories_tenant_isolation ON memories
-    FOR ALL TO PUBLIC
-    USING (tenant_id = current_setting('pond.current_tenant_id')::uuid);
+    FOR ALL TO authenticated, service_role
+    USING (tenant_id = current_setting('pond.current_tenant_id')::uuid)
+    WITH CHECK (tenant_id = current_setting('pond.current_tenant_id')::uuid);
 
 -- Cascade RLS to related tables
 CREATE POLICY embeddings_tenant_isolation ON embeddings
-    FOR ALL TO PUBLIC
-    USING (memory_id IN (SELECT id FROM memories WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid));
+    FOR ALL TO authenticated, service_role
+    USING (memory_id IN (SELECT id FROM memories WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid))
+    WITH CHECK (memory_id IN (SELECT id FROM memories WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid));
 
 CREATE POLICY sources_tenant_isolation ON sources
-    FOR ALL TO PUBLIC
-    USING (memory_id IN (SELECT id FROM memories WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid));
+    FOR ALL TO authenticated, service_role
+    USING (memory_id IN (SELECT id FROM memories WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid))
+    WITH CHECK (memory_id IN (SELECT id FROM memories WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid));
 
 CREATE POLICY tags_tenant_isolation ON tags
-    FOR ALL TO PUBLIC
-    USING (memory_id IN (SELECT id FROM memories WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid));
+    FOR ALL TO authenticated, service_role
+    USING (memory_id IN (SELECT id FROM memories WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid))
+    WITH CHECK (memory_id IN (SELECT id FROM memories WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid));
 
 CREATE POLICY entities_tenant_isolation ON entities
-    FOR ALL TO PUBLIC
-    USING (memory_id IN (SELECT id FROM memories WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid));
+    FOR ALL TO authenticated, service_role
+    USING (memory_id IN (SELECT id FROM memories WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid))
+    WITH CHECK (memory_id IN (SELECT id FROM memories WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid));
 
 CREATE POLICY actions_tenant_isolation ON actions
-    FOR ALL TO PUBLIC
-    USING (memory_id IN (SELECT id FROM memories WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid));
+    FOR ALL TO authenticated, service_role
+    USING (memory_id IN (SELECT id FROM memories WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid))
+    WITH CHECK (memory_id IN (SELECT id FROM memories WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid));

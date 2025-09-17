@@ -130,14 +130,18 @@ export class MigrationRunner {
           `migration_${migration.version}`,
         );
 
+        let transactionStarted = false;
         let transactionCommitted = false;
 
         try {
           this.logger.debug`⚡ Starting transaction for migration ${migration.version}`;
           await transaction.begin();
+          transactionStarted = true;
 
           this.logger.debug`📝 Executing migration SQL...`;
-          this.logger.debug`SQL Preview: ${migration.sql.substring(0, 100).replace(/\n/g, ' ').trim()}${migration.sql.length > 100 ? '...' : ''}`;
+          this.logger.debug`SQL Preview: ${
+            migration.sql.substring(0, 100).replace(/\n/g, " ").trim()
+          }${migration.sql.length > 100 ? "..." : ""}`;
 
           // Execute migration SQL - THIS IS WHERE THE MAGIC (AND ERRORS) HAPPEN!
           await transaction.queryArray(migration.sql);
@@ -159,8 +163,8 @@ export class MigrationRunner {
           // Update our local set to avoid redundant checks
           executedVersions.add(migration.version);
         } catch (error) {
-          // Only rollback if transaction hasn't been committed yet
-          if (!transactionCommitted) {
+          // Only rollback if transaction was started and not yet committed
+          if (transactionStarted && !transactionCommitted) {
             this.logger.warning`🔄 Rolling back transaction for migration ${migration.version}...`;
             try {
               await transaction.rollback();
@@ -409,9 +413,13 @@ export class MigrationRunner {
           `rollback_migration_${version}`,
         );
 
+        let transactionStarted = false;
+        let transactionCommitted = false;
+
         try {
           this.logger.debug`⚡ Starting rollback transaction for migration ${version}`;
           await transaction.begin();
+          transactionStarted = true;
 
           this.logger.debug`📝 Executing rollback SQL...`;
           // Execute down migration SQL
@@ -424,10 +432,14 @@ export class MigrationRunner {
           `;
 
           await transaction.commit();
+          transactionCommitted = true;
+
           this.logger.info`✅ Migration ${version} rolled back successfully! 🎉`;
         } catch (error) {
-          this.logger.warning`🔄 Rolling back transaction for failed rollback...`;
-          await transaction.rollback();
+          if (transactionStarted && !transactionCommitted) {
+            this.logger.warning`🔄 Rolling back transaction for failed rollback...`;
+            await transaction.rollback();
+          }
           this.logger.error`💥 Rollback of migration ${version} failed: ${error.message}`;
           throw error;
         }

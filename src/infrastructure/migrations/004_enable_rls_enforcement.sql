@@ -22,13 +22,20 @@ ALTER TABLE actions FORCE ROW LEVEL SECURITY;
 
 -- Memories table policies
 CREATE POLICY memories_tenant_rls ON memories
-    FOR ALL TO PUBLIC
-    USING (tenant_id = current_setting('pond.current_tenant_id')::uuid);
+    FOR ALL TO authenticated, service_role
+    USING (tenant_id = current_setting('pond.current_tenant_id')::uuid)
+    WITH CHECK (tenant_id = current_setting('pond.current_tenant_id')::uuid);
 
 -- Embeddings table policies (inherits tenant isolation through memory_id FK)
 CREATE POLICY embeddings_tenant_rls ON embeddings
-    FOR ALL TO PUBLIC
+    FOR ALL TO authenticated, service_role
     USING (
+        memory_id IN (
+            SELECT id FROM memories
+            WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid
+        )
+    )
+    WITH CHECK (
         memory_id IN (
             SELECT id FROM memories
             WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid
@@ -37,8 +44,14 @@ CREATE POLICY embeddings_tenant_rls ON embeddings
 
 -- Sources table policies (inherits tenant isolation through memory_id FK)
 CREATE POLICY sources_tenant_rls ON sources
-    FOR ALL TO PUBLIC
+    FOR ALL TO authenticated, service_role
     USING (
+        memory_id IN (
+            SELECT id FROM memories
+            WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid
+        )
+    )
+    WITH CHECK (
         memory_id IN (
             SELECT id FROM memories
             WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid
@@ -47,8 +60,14 @@ CREATE POLICY sources_tenant_rls ON sources
 
 -- Tags table policies (inherits tenant isolation through memory_id FK)
 CREATE POLICY tags_tenant_rls ON tags
-    FOR ALL TO PUBLIC
+    FOR ALL TO authenticated, service_role
     USING (
+        memory_id IN (
+            SELECT id FROM memories
+            WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid
+        )
+    )
+    WITH CHECK (
         memory_id IN (
             SELECT id FROM memories
             WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid
@@ -57,8 +76,14 @@ CREATE POLICY tags_tenant_rls ON tags
 
 -- Entities table policies (inherits tenant isolation through memory_id FK)
 CREATE POLICY entities_tenant_rls ON entities
-    FOR ALL TO PUBLIC
+    FOR ALL TO authenticated, service_role
     USING (
+        memory_id IN (
+            SELECT id FROM memories
+            WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid
+        )
+    )
+    WITH CHECK (
         memory_id IN (
             SELECT id FROM memories
             WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid
@@ -67,8 +92,14 @@ CREATE POLICY entities_tenant_rls ON entities
 
 -- Actions table policies (inherits tenant isolation through memory_id FK)
 CREATE POLICY actions_tenant_rls ON actions
-    FOR ALL TO PUBLIC
+    FOR ALL TO authenticated, service_role
     USING (
+        memory_id IN (
+            SELECT id FROM memories
+            WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid
+        )
+    )
+    WITH CHECK (
         memory_id IN (
             SELECT id FROM memories
             WHERE tenant_id = current_setting('pond.current_tenant_id')::uuid
@@ -85,8 +116,8 @@ BEGIN
         RAISE EXCEPTION 'Tenant ID cannot be null';
     END IF;
 
-    -- Set the session variable for RLS policies
-    PERFORM set_config('pond.current_tenant_id', tenant_uuid::text, false);
+    -- Set the session variable for RLS policies; make it LOCAL so it resets automatically
+    PERFORM set_config('pond.current_tenant_id', tenant_uuid::text, true);
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
@@ -108,19 +139,45 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 DO $$
 DECLARE
     role_record RECORD;
+    -- Reserved roles managed by Postgres/Supabase that cannot be altered
+    reserved_roles CONSTANT TEXT[] := ARRAY[
+        'postgres',               -- default admin
+        'rds_superuser',          -- AWS managed role (kept from prior list)
+        'authenticator',          -- Supabase entrypoint for API clients
+        'anon',                   -- Supabase anonymous role
+        'authenticated',          -- Supabase authenticated role
+        'service_role',           -- Supabase service key role
+        'supabase_admin',         -- Supabase internal maintenance role
+        'supabase_auth_admin',    -- Supabase auth management
+        'supabase_storage_admin', -- Supabase storage management
+        'supabase_functions_admin', -- Supabase edge functions management
+        'supabase_read_only_user', -- Supabase shared read-only role
+        'supabase_realtime_admin', -- Supabase realtime management role
+        'supabase_replication_admin', -- Supabase replication management
+        'supabase_etl_admin',     -- Supabase ETL operations role
+        'pg_database_owner',      -- Supabase-managed cluster owner
+        'pgbouncer',              -- Connection pooler role
+        'dashboard_user',         -- Supabase dashboard internal user
+        'dashboard_token'         -- Supabase dashboard token role
+    ];
 BEGIN
     FOR role_record IN
-        SELECT rolname FROM pg_roles
+        SELECT rolname
+        FROM pg_roles
         WHERE NOT rolsuper
-        AND rolname NOT IN ('postgres', 'rds_superuser')
+          AND rolname <> current_user
+          AND rolname NOT IN (SELECT UNNEST(reserved_roles))
+          AND rolname NOT LIKE 'pg\_%'  -- reserved PostgreSQL roles
+          AND rolname NOT LIKE 'supabase\_%' -- remaining Supabase internals
+          AND rolname NOT LIKE 'dashboard\_%'
     LOOP
         EXECUTE format('ALTER ROLE %I NOBYPASSRLS', role_record.rolname);
     END LOOP;
 END $$;
 
--- Grant usage on the helper functions to application roles
-GRANT EXECUTE ON FUNCTION pond_set_tenant_context(UUID) TO PUBLIC;
-GRANT EXECUTE ON FUNCTION pond_get_tenant_context() TO PUBLIC;
+-- Grant usage on the helper functions to the roles that need them
+GRANT EXECUTE ON FUNCTION pond_set_tenant_context(UUID) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION pond_get_tenant_context() TO authenticated, service_role;
 
 -- Add helpful comments for documentation
 COMMENT ON FUNCTION pond_set_tenant_context(UUID) IS

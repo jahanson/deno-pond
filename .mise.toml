@@ -1,3 +1,7 @@
+[env]
+DATABASE_URL = 'op://Private/Supabase Connection Strings/pond_dev'
+CA_CERT_PATH = '.private/prod-ca-2021.crt'
+
 [tasks.pre-commit]
 description = "Pre-commit checks for code quality"
 run = [
@@ -5,7 +9,7 @@ run = [
   "deno task fmt:check",
   "deno lint src/",
   "deno task check",
-  "echo '✅ All pre-commit checks passed!'"
+  "echo '✅ All pre-commit checks passed!'",
 ]
 
 [tasks.pre-commit-with-tests]
@@ -16,7 +20,7 @@ run = [
   "deno lint src/",
   "deno task check",
   "deno task test",
-  "echo '✅ All pre-commit checks and tests passed!'"
+  "echo '✅ All pre-commit checks and tests passed!'",
 ]
 
 [tasks.format]
@@ -49,3 +53,13 @@ run = "deno lint src/"
 [tasks.typecheck]
 description = "Run TypeScript type checking"
 run = "deno task check"
+
+[tasks.tables_bootstrap]
+description = "Apply SQL migrations."
+alias = "migrate"
+run = "op run -- deno run --allow-env --allow-net --allow-read $MISE_PROJECT_ROOT/src/infrastructure/migrations/run-migrations.ts"
+
+[tasks.tables_nuke]
+description = "Drop all tables in the db."
+alias = "nuke"
+run = "op run -- deno run --allow-env --allow-net --allow-read nuke_tables.ts"
