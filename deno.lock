@@ -20,7 +20,8 @@
     "jsr:@std/path@^1.0.8": "1.1.2",
     "jsr:@std/path@^1.1.1": "1.1.2",
     "jsr:@std/testing@*": "1.0.15",
-    "jsr:@std/testing@^1.0.15": "1.0.15"
+    "jsr:@std/testing@^1.0.15": "1.0.15",
+    "npm:@types/node@24.0.7": "24.0.7"
   },
   "jsr": {
     "@db/postgres@0.19.5": {
@@ -39,7 +40,8 @@
     "@logtape/pretty@1.1.0": {
       "integrity": "6f4e237dd4bbc1fcd7528395b30b0c7797a88ffe1705f09ce5489559016f38de",
       "dependencies": [
-        "jsr:@logtape/logtape"
+        "jsr:@logtape/logtape",
+        "npm:@types/node"
       ]
     },
     "@std/assert@1.0.14": {
@@ -92,6 +94,17 @@
         "jsr:@std/internal@^1.0.10",
         "jsr:@std/path@^1.1.1"
       ]
+    }
+  },
+  "npm": {
+    "@types/node@24.0.7": {
+      "integrity": "sha512-YIEUUr4yf8q8oQoXPpSlnvKNVKDQlPMWrmOcgzoduo7kvA2UF0/BwJ/eMKFTiTtkNL17I0M6Xe2tvwFU7be6iw==",
+      "dependencies": [
+        "undici-types"
+      ]
+    },
+    "undici-types@7.8.0": {
+      "integrity": "sha512-9UJ2xGDvQ43tYyVMpuHlsgApydB8ZKfVYTsLDhXkFL/6gfkp+U8xTGdh8pMJv1SpZna0zxG1DwsKZsreLbXBxw=="
     }
   },
   "workspace": {

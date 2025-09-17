@@ -17,7 +17,6 @@ import {
   IDatabaseTransaction,
 } from "../database/database-client.interface.ts";
 import { getLogger } from "@logtape/logtape";
-import { configurePondLogging } from "../logging/config.ts";
 
 /**
  * PostgreSQL implementation of the MemoryRepository interface.
@@ -49,7 +48,8 @@ export class PostgresMemoryRepository implements MemoryRepository {
    * @param client - Database client implementing IDatabaseClient interface
    */
   constructor(private client: IDatabaseClient | IDatabaseTransaction) {
-    this.logger.debug`💾 PostgresMemoryRepository initialized with MAXIMUM RICE!`;
+    this.logger
+      .debug`💾 PostgresMemoryRepository initialized with MAXIMUM RICE!`;
   }
 
   /**
@@ -70,7 +70,10 @@ export class PostgresMemoryRepository implements MemoryRepository {
     const { tenantId, tx } = options;
 
     this.logger.info`💾 Saving memory to repository`;
-    this.logger.debug`📊 Memory details: content length=${memory.content.length}, embedding=${memory.getEmbedding() ? 'present' : 'none'}, tags=${memory.getTags().length}`;
+    this.logger
+      .debug`📊 Memory details: content length=${memory.content.length}, embedding=${
+      memory.getEmbedding() ? "present" : "none"
+    }, tags=${memory.getTags().length}`;
 
     const startTime = performance.now();
 
@@ -104,10 +107,11 @@ export class PostgresMemoryRepository implements MemoryRepository {
 
       const duration = Math.round(performance.now() - startTime);
       this.logger.info`🎉 Memory saved successfully in ${duration}ms`;
-
     } catch (error) {
       const duration = Math.round(performance.now() - startTime);
-      this.logger.error`💥 Memory save failed after ${duration}ms: ${error.message}`;
+      const message = error instanceof Error ? error.message : "unknown error";
+      this.logger.error`💥 Memory save failed after ${duration}ms: ${message}`;
+      this.logger.debug`Full error: ${error}`;
       throw error;
     }
   }
@@ -120,7 +124,9 @@ export class PostgresMemoryRepository implements MemoryRepository {
     this.logger.debug`🚀 Starting performSave with detailed logging`;
 
     // Insert main memory record - RLS will enforce tenant isolation
-    this.logger.debug`📝 Inserting memory record (content_hash: ${memory.contentHash.substring(0, 8)}...)`;
+    this.logger.debug`📝 Inserting memory record (content_hash: ${
+      memory.contentHash.substring(0, 8)
+    }...)`;
     const memoryResult = await tx.queryObject<{ id: string }>`
       INSERT INTO memories (tenant_id, content, content_hash, status, created_at)
       VALUES (${tenantId}, ${memory.content}, ${memory.contentHash}, ${memory.status}, ${memory.createdAt})
@@ -140,7 +146,8 @@ export class PostgresMemoryRepository implements MemoryRepository {
     // Insert embedding if present
     const embedding = memory.getEmbedding();
     if (embedding) {
-      this.logger.debug`🤖 Inserting embedding (dimensions: ${embedding.dimensions}, model: ${embedding.model})`;
+      this.logger
+        .debug`🤖 Inserting embedding (dimensions: ${embedding.dimensions}, model: ${embedding.model})`;
       // Convert embedding vector to pgvector string format for proper type binding
       const vectorString = `[${embedding.vector.join(",")}]`;
 
@@ -157,7 +164,9 @@ export class PostgresMemoryRepository implements MemoryRepository {
     // Insert source if present
     const source = memory.getSource();
     if (source) {
-      this.logger.debug`📄 Inserting source (type: ${source.type}, context: ${source.context.substring(0, 30)}...)`;
+      this.logger.debug`📄 Inserting source (type: ${source.type}, context: ${
+        source.context.substring(0, 30)
+      }...)`;
       await tx.queryArray`
         INSERT INTO sources (memory_id, type, context, hash, created_at)
         VALUES (${memoryId}, ${source.type}, ${source.context}, ${source.hash}, ${source.createdAt})
@@ -171,7 +180,9 @@ export class PostgresMemoryRepository implements MemoryRepository {
     // Batch insert tags - single atomic INSERT with multiple VALUES
     const tags = memory.getTags();
     if (tags.length > 0) {
-      this.logger.debug`🏷️  Batch inserting ${tags.length} tags: ${tags.map(t => t.normalized).join(', ')}`;
+      this.logger.debug`🏷️  Batch inserting ${tags.length} tags: ${
+        tags.map((t) => t.normalized).join(", ")
+      }`;
 
       // Prepare batch data: array of [memory_id, raw, normalized, slug] for each tag
       const tagRows = tags.map(
@@ -198,7 +209,9 @@ export class PostgresMemoryRepository implements MemoryRepository {
     // Batch insert entities - single atomic INSERT with multiple VALUES
     const entities = memory.getEntities();
     if (entities.length > 0) {
-      this.logger.debug`🏢 Batch inserting ${entities.length} entities: ${entities.map(e => `${e.text}(${e.type})`).join(', ')}`;
+      this.logger.debug`🏢 Batch inserting ${entities.length} entities: ${
+        entities.map((e) => `${e.text}(${e.type})`).join(", ")
+      }`;
 
       // Prepare batch data: array of [memory_id, text, type] for each entity
       const entityRows = entities.map(
@@ -224,7 +237,9 @@ export class PostgresMemoryRepository implements MemoryRepository {
     // Batch insert actions - single atomic INSERT with multiple VALUES
     const actions = memory.getActions();
     if (actions.length > 0) {
-      this.logger.debug`⚡ Batch inserting ${actions.length} actions: ${actions.map(a => a.action).join(', ')}`;
+      this.logger.debug`⚡ Batch inserting ${actions.length} actions: ${
+        actions.map((a) => a.action).join(", ")
+      }`;
 
       // Prepare batch data: array of [memory_id, action, slug] for each action
       const actionRows = actions.map(
@@ -247,7 +262,8 @@ export class PostgresMemoryRepository implements MemoryRepository {
       this.logger.debug`⏭️  No actions to insert`;
     }
 
-    this.logger.debug`🎉 performSave completed successfully for memory ${memoryId}`;
+    this.logger
+      .debug`🎉 performSave completed successfully for memory ${memoryId}`;
   }
 
   async findById(id: string, options: QueryOptions): Promise<Memory | null> {
@@ -260,7 +276,8 @@ export class PostgresMemoryRepository implements MemoryRepository {
       // Set tenant context for RLS enforcement
       await this.setTenantContext(tenantId, this.client);
 
-      this.logger.debug`📊 Executing aggregated query for memory reconstruction`;
+      this.logger
+        .debug`📊 Executing aggregated query for memory reconstruction`;
 
       // Use a single aggregated query to avoid row multiplication and N+1 queries
       const result = await this.client.queryObject<{
@@ -317,82 +334,86 @@ export class PostgresMemoryRepository implements MemoryRepository {
       const row = result.rows[0];
       const persistedStatus = row.status as MemoryStatus;
 
-      this.logger.debug`🔧 Reconstructing memory object with ${row.tags.length} tags, ${row.entities.length} entities, ${row.actions.length} actions`;
+      this.logger
+        .debug`🔧 Reconstructing memory object with ${row.tags.length} tags, ${row.entities.length} entities, ${row.actions.length} actions`;
 
-    // Start with base memory - need to reconstruct with proper timestamp
-    const memoryWithTimestamp = Object.create(Memory.prototype);
-    Object.assign(memoryWithTimestamp, {
-      content: row.content,
-      contentHash: row.content_hash,
-      status: MemoryStatus.DRAFT,
-      createdAt: row.created_at,
-      tags: [],
-      entities: [],
-      actions: [],
-      embedding: undefined,
-      source: undefined,
-    });
-
-    let memory = memoryWithTimestamp as Memory;
-
-    // Add embedding if present
-    if (
-      row.embedding_vector && row.embedding_dimensions && row.embedding_model
-    ) {
-      const embedding = new Embedding(
-        row.embedding_vector,
-        row.embedding_model,
-      );
-      memory = memory.setEmbedding(embedding);
-    }
-
-    // Add source if present
-    if (
-      row.source_type && row.source_context && row.source_hash &&
-      row.source_created_at
-    ) {
-      // Create source with preserved timestamp from database
-      const sourceWithTimestamp = Object.create(Source.prototype);
-      Object.assign(sourceWithTimestamp, {
-        type: row.source_type,
-        context: row.source_context,
-        hash: row.source_hash,
-        _createdAt: row.source_created_at,
+      // Start with base memory - need to reconstruct with proper timestamp
+      const memoryWithTimestamp = Object.create(Memory.prototype);
+      Object.assign(memoryWithTimestamp, {
+        content: row.content,
+        contentHash: row.content_hash,
+        status: MemoryStatus.DRAFT,
+        createdAt: row.created_at,
+        tags: [],
+        entities: [],
+        actions: [],
+        embedding: undefined,
+        source: undefined,
       });
-      memory = memory.setSource(sourceWithTimestamp as Source);
-    }
 
-    // Add tags from aggregated JSON
-    for (const tagData of row.tags) {
-      const tag = new Tag(tagData.raw);
-      memory = memory.addTag(tag);
-    }
+      let memory = memoryWithTimestamp as Memory;
 
-    // Add entities from aggregated JSON
-    for (const entityData of row.entities) {
-      const entity = new Entity(entityData.text, entityData.type);
-      memory = memory.addEntity(entity);
-    }
+      // Add embedding if present
+      if (
+        row.embedding_vector && row.embedding_dimensions && row.embedding_model
+      ) {
+        const embedding = new Embedding(
+          row.embedding_vector,
+          row.embedding_model,
+        );
+        memory = memory.setEmbedding(embedding);
+      }
 
-    // Add actions from aggregated JSON
-    for (const actionData of row.actions) {
-      const action = new Action(actionData.action);
-      memory = memory.addAction(action);
-    }
+      // Add source if present
+      if (
+        row.source_type && row.source_context && row.source_hash &&
+        row.source_created_at
+      ) {
+        // Create source with preserved timestamp from database
+        const sourceWithTimestamp = Object.create(Source.prototype);
+        Object.assign(sourceWithTimestamp, {
+          type: row.source_type,
+          context: row.source_context,
+          hash: row.source_hash,
+          _createdAt: row.source_created_at,
+        });
+        memory = memory.setSource(sourceWithTimestamp as Source);
+      }
+
+      // Add tags from aggregated JSON
+      for (const tagData of row.tags) {
+        const tag = new Tag(tagData.raw);
+        memory = memory.addTag(tag);
+      }
+
+      // Add entities from aggregated JSON
+      for (const entityData of row.entities) {
+        const entity = new Entity(entityData.text, entityData.type);
+        memory = memory.addEntity(entity);
+      }
+
+      // Add actions from aggregated JSON
+      for (const actionData of row.actions) {
+        const action = new Action(actionData.action);
+        memory = memory.addAction(action);
+      }
 
       if (persistedStatus === MemoryStatus.STORED) {
         const duration = Math.round(performance.now() - startTime);
-        this.logger.info`✅ Memory found and reconstructed (STORED status) in ${duration}ms`;
+        this.logger
+          .info`✅ Memory found and reconstructed (STORED status) in ${duration}ms`;
         return memory.markAsStored();
       }
 
       const duration = Math.round(performance.now() - startTime);
-      this.logger.info`✅ Memory found and reconstructed (DRAFT status) in ${duration}ms`;
+      this.logger
+        .info`✅ Memory found and reconstructed (DRAFT status) in ${duration}ms`;
       return memory;
-
     } catch (error) {
       const duration = Math.round(performance.now() - startTime);
-      this.logger.error`💥 findById failed after ${duration}ms: ${error.message}`;
+      const message = error instanceof Error ? error.message : "unknown error";
+      this.logger.error`💥 findById failed after ${duration}ms: ${message}`;
+      this.logger.debug`Full error: ${error}`;
       throw error;
     }
   }
@@ -425,7 +446,8 @@ export class PostgresMemoryRepository implements MemoryRepository {
     const { tenantId } = options;
 
     this.logger.info`🔍 Finding similar memories using ${metric} similarity`;
-    this.logger.debug`📊 Search params: threshold=${threshold}, limit=${limit}, dimensions=${embedding.dimensions}`;
+    this.logger
+      .debug`📊 Search params: threshold=${threshold}, limit=${limit}, dimensions=${embedding.dimensions}`;
 
     const startTime = performance.now();
 
@@ -435,26 +457,27 @@ export class PostgresMemoryRepository implements MemoryRepository {
       // Convert embedding vector to pgvector string format for proper type binding
       const vectorString = `[${embedding.vector.join(",")}]`;
 
-      this.logger.debug`🤖 Vector search using pgvector with ${metric} distance operator`;
+      this.logger
+        .debug`🤖 Vector search using pgvector with ${metric} distance operator`;
 
-    // Core pattern: ORDER BY e.vector <=> $query ASC with WHERE e.vector <=> $query <= 1 - $threshold
-    // This enables optimal index usage with direct operator in ORDER BY
-    let result: {
-      rows: Array<{
-        memory_id: string;
-        distance: number;
-        similarity: number;
-      }>;
-    };
+      // Core pattern: ORDER BY e.vector <=> $query ASC with WHERE e.vector <=> $query <= 1 - $threshold
+      // This enables optimal index usage with direct operator in ORDER BY
+      let result: {
+        rows: Array<{
+          memory_id: string;
+          distance: number;
+          similarity: number;
+        }>;
+      };
 
-    if (metric === "cosine") {
-      // Core cosine pattern: ORDER BY e.vector <=> $query ASC with explicit threshold
-      const distanceThreshold = 1 - threshold; // cosine distance = 1 - cosine similarity
-      result = await this.client.queryObject<{
-        memory_id: string;
-        distance: number;
-        similarity: number;
-      }>`
+      if (metric === "cosine") {
+        // Core cosine pattern: ORDER BY e.vector <=> $query ASC with explicit threshold
+        const distanceThreshold = 1 - threshold; // cosine distance = 1 - cosine similarity
+        result = await this.client.queryObject<{
+          memory_id: string;
+          distance: number;
+          similarity: number;
+        }>`
         SELECT
           m.id as memory_id,
           e.vector <=> ${vectorString}::vector as distance,
@@ -467,13 +490,13 @@ export class PostgresMemoryRepository implements MemoryRepository {
         ORDER BY e.vector <=> ${vectorString}::vector ASC
         LIMIT ${limit}
       `;
-    } else if (metric === "euclidean") {
-      // L2 distance pattern for euclidean similarity
-      result = await this.client.queryObject<{
-        memory_id: string;
-        distance: number;
-        similarity: number;
-      }>`
+      } else if (metric === "euclidean") {
+        // L2 distance pattern for euclidean similarity
+        result = await this.client.queryObject<{
+          memory_id: string;
+          distance: number;
+          similarity: number;
+        }>`
         SELECT
           m.id as memory_id,
           e.vector <-> ${vectorString}::vector as distance,
@@ -486,14 +509,14 @@ export class PostgresMemoryRepository implements MemoryRepository {
         ORDER BY e.vector <-> ${vectorString}::vector ASC
         LIMIT ${limit}
       `;
-    } else { // dot product
-      // Inner product pattern for dot product similarity
-      const distanceThreshold = -threshold; // pgvector returns negative inner product
-      result = await this.client.queryObject<{
-        memory_id: string;
-        distance: number;
-        similarity: number;
-      }>`
+      } else { // dot product
+        // Inner product pattern for dot product similarity
+        const distanceThreshold = -threshold; // pgvector returns negative inner product
+        result = await this.client.queryObject<{
+          memory_id: string;
+          distance: number;
+          similarity: number;
+        }>`
         SELECT
           m.id as memory_id,
           e.vector <#> ${vectorString}::vector as distance,
@@ -506,15 +529,19 @@ export class PostgresMemoryRepository implements MemoryRepository {
         ORDER BY e.vector <#> ${vectorString}::vector ASC
         LIMIT ${limit}
       `;
-    }
+      }
 
-      this.logger.debug`📊 Raw similarity search returned ${result.rows.length} candidates`;
+      this.logger
+        .debug`📊 Raw similarity search returned ${result.rows.length} candidates`;
 
       // Convert results to SimilarResult format with full Memory reconstruction
       const similarResults: SimilarResult[] = [];
 
       for (const row of result.rows) {
-        this.logger.debug`🔧 Reconstructing memory ${row.memory_id} (similarity: ${row.similarity.toFixed(3)}, distance: ${row.distance.toFixed(3)})`;
+        this.logger
+          .debug`🔧 Reconstructing memory ${row.memory_id} (similarity: ${
+          row.similarity.toFixed(3)
+        }, distance: ${row.distance.toFixed(3)})`;
 
         // Reconstruct the full Memory object for each result
         const memory = await this.findById(row.memory_id, options);
@@ -528,18 +555,24 @@ export class PostgresMemoryRepository implements MemoryRepository {
       }
 
       const duration = Math.round(performance.now() - startTime);
-      this.logger.info`🎉 Found ${similarResults.length} similar memories in ${duration}ms`;
+      this.logger
+        .info`🎉 Found ${similarResults.length} similar memories in ${duration}ms`;
 
       if (similarResults.length > 0) {
-        const avgSimilarity = similarResults.reduce((sum, r) => sum + r.similarity, 0) / similarResults.length;
-        this.logger.debug`📈 Average similarity: ${avgSimilarity.toFixed(3)}, best: ${similarResults[0]?.similarity.toFixed(3)}`;
+        const avgSimilarity = similarResults.reduce((sum, r) =>
+          sum + r.similarity, 0) / similarResults.length;
+        this.logger.debug`📈 Average similarity: ${
+          avgSimilarity.toFixed(3)
+        }, best: ${similarResults[0]?.similarity.toFixed(3)}`;
       }
 
       return similarResults;
-
     } catch (error) {
       const duration = Math.round(performance.now() - startTime);
-      this.logger.error`💥 Similarity search failed after ${duration}ms: ${error.message}`;
+      const message = error instanceof Error ? error.message : "unknown error";
+      this.logger
+        .error`💥 Similarity search failed after ${duration}ms: ${message}`;
+      this.logger.debug`Full error: ${error}`;
       throw error;
     }
   }

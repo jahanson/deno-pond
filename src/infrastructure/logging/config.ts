@@ -38,11 +38,11 @@ export const riceFormatter = getPrettyFormatter({
 
   // 🎨 Custom level colors - Nord/Dracula hybrid perfection
   levelColors: {
-    debug: "#8be9fd",    // Cyan - for that terminal hacker vibe
-    info: "#50fa7b",     // Green - matrix code aesthetic
-    warning: "#ffb86c",  // Orange - warm sunset glow
-    error: "#ff5555",    // Red - danger zone
-    fatal: "#bd93f9"     // Purple - galaxy brain
+    debug: "#8be9fd", // Cyan - for that terminal hacker vibe
+    info: "#50fa7b", // Green - matrix code aesthetic
+    warning: "#ffb86c", // Orange - warm sunset glow
+    error: "#ff5555", // Red - danger zone
+    fatal: "#bd93f9", // Purple - galaxy brain
   },
   levelStyle: ["bold", "underline"], // Extra sauce
 
@@ -55,11 +55,11 @@ export const riceFormatter = getPrettyFormatter({
 
   // 🎯 Category-specific colors for maximum visual hierarchy
   categoryColorMap: new Map([
-    [["deno-pond", "app"], "#f1fa8c"],        // Yellow - main app
-    [["deno-pond", "database"], "#8be9fd"],   // Cyan - data flows
-    [["deno-pond", "migration"], "#ff79c6"],  // Pink - schema changes
-    [["deno-pond", "memory"], "#50fa7b"],     // Green - memory ops
-    [["deno-pond", "embedding"], "#bd93f9"],  // Purple - AI magic
+    [["deno-pond", "app"], "#f1fa8c"], // Yellow - main app
+    [["deno-pond", "database"], "#8be9fd"], // Cyan - data flows
+    [["deno-pond", "migration"], "#ff79c6"], // Pink - schema changes
+    [["deno-pond", "memory"], "#50fa7b"], // Green - memory ops
+    [["deno-pond", "embedding"], "#bd93f9"], // Purple - AI magic
     [["deno-pond", "repository"], "#ffb86c"], // Orange - persistence
     [["deno-pond", "connection"], "#f8f8f2"], // Off-white - connectivity
   ]),
@@ -73,8 +73,8 @@ export const riceFormatter = getPrettyFormatter({
     info: "✨",
     warning: "⚡",
     error: "💥",
-    fatal: "☠️"
-  }
+    fatal: "☠️",
+  },
 });
 
 /**
@@ -86,20 +86,22 @@ export const riceFormatter = getPrettyFormatter({
  *
  * @param lowestLevel - Minimum log level to capture (default: "debug" for full rice)
  */
-export async function configurePondLogging(lowestLevel: "debug" | "info" | "warning" | "error" | "fatal" = "debug"): Promise<void> {
+export async function configurePondLogging(
+  lowestLevel: "debug" | "info" | "warning" | "error" | "fatal" = "debug",
+): Promise<void> {
   await configure({
     sinks: {
       console: getConsoleSink({
-        formatter: riceFormatter
-      })
+        formatter: riceFormatter,
+      }),
     },
     loggers: [
       // Capture everything from deno-pond with our beautiful formatting
       { category: ["deno-pond"], lowestLevel, sinks: ["console"] },
 
       // Also capture root level logs at info+ to avoid spam but keep important stuff
-      { category: [], lowestLevel: "info", sinks: ["console"] }
-    ]
+      { category: [], lowestLevel: "info", sinks: ["console"] },
+    ],
   });
 }
 
@@ -137,7 +139,7 @@ export const ASCII_HEADERS = {
     🔥 MAXIMUM RICE MODE ACTIVATED 🔥
     💻 Aesthetic Level: r/unixporn Hall of Fame 💻
     🏆 This logging setup would make r/unixporn WEEP with joy! 🏆
-    💫 Ready to debug in MAXIMUM AESTHETIC! 💫`
+    💫 Ready to debug in MAXIMUM AESTHETIC! 💫`,
 } as const;
 
 /**
@@ -147,7 +149,9 @@ export const ASCII_HEADERS = {
 export function displayStartupBanner(moduleName: string): void {
   console.log(ASCII_HEADERS.POND_LOGO);
   console.log(ASCII_HEADERS.STARTUP);
-  console.log(`\n    🚀 ${moduleName} MODULE INITIALIZED WITH MAXIMUM RICE! 🚀\n`);
+  console.log(
+    `\n    🚀 ${moduleName} MODULE INITIALIZED WITH MAXIMUM RICE! 🚀\n`,
+  );
 }
 
 /**
