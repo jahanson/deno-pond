@@ -10,6 +10,9 @@ coverage/
 .env.local
 .env.*.local
 
+# Sensitive folders
+.private/
+
 # Logs
 logs
 *.log
