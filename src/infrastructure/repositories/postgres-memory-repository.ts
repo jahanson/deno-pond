@@ -17,7 +17,6 @@ import {
   IDatabaseTransaction,
 } from "../database/database-client.interface.ts";
 import { getLogger } from "@logtape/logtape";
-import { configurePondLogging } from "../logging/config.ts";
 
 /**
  * PostgreSQL implementation of the MemoryRepository interface.
@@ -110,8 +109,9 @@ export class PostgresMemoryRepository implements MemoryRepository {
       this.logger.info`🎉 Memory saved successfully in ${duration}ms`;
     } catch (error) {
       const duration = Math.round(performance.now() - startTime);
-      this.logger
-        .error`💥 Memory save failed after ${duration}ms: ${error.message}`;
+      const message = error instanceof Error ? error.message : "unknown error";
+      this.logger.error`💥 Memory save failed after ${duration}ms: ${message}`;
+      this.logger.debug`Full error: ${error}`;
       throw error;
     }
   }
@@ -411,8 +411,9 @@ export class PostgresMemoryRepository implements MemoryRepository {
       return memory;
     } catch (error) {
       const duration = Math.round(performance.now() - startTime);
-      this.logger
-        .error`💥 findById failed after ${duration}ms: ${error.message}`;
+      const message = error instanceof Error ? error.message : "unknown error";
+      this.logger.error`💥 findById failed after ${duration}ms: ${message}`;
+      this.logger.debug`Full error: ${error}`;
       throw error;
     }
   }
@@ -568,8 +569,10 @@ export class PostgresMemoryRepository implements MemoryRepository {
       return similarResults;
     } catch (error) {
       const duration = Math.round(performance.now() - startTime);
+      const message = error instanceof Error ? error.message : "unknown error";
       this.logger
-        .error`💥 Similarity search failed after ${duration}ms: ${error.message}`;
+        .error`💥 Similarity search failed after ${duration}ms: ${message}`;
+      this.logger.debug`Full error: ${error}`;
       throw error;
     }
   }

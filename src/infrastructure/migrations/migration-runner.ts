@@ -2,8 +2,8 @@ import { Client } from "@db/postgres";
 import { walk } from "@std/fs/walk";
 import { getLogger } from "@logtape/logtape";
 import {
-  configurePondLogging,
-  displayStartupBanner,
+  configurePondLogging as _configurePondLogging,
+  displayStartupBanner as _displayStartupBanner,
 } from "../logging/config.ts";
 
 /**
@@ -185,14 +185,20 @@ export class MigrationRunner {
               await transaction.rollback();
               this.logger.debug`✅ Transaction rollback successful`;
             } catch (rollbackError) {
+              const rollbackMessage = rollbackError instanceof Error
+                ? rollbackError.message
+                : `${rollbackError}`;
               this.logger
-                .error`🚨 CRITICAL: Failed to rollback transaction: ${rollbackError}`;
+                .error`🚨 CRITICAL: Failed to rollback transaction: ${rollbackMessage}`;
             }
           }
 
+          const message = error instanceof Error
+            ? error.message
+            : "unknown error";
           this.logger
-            .error`💥 Migration ${migration.version} failed with error: ${error.message}`;
-          this.logger.debug`🔍 Full error details:`, error;
+            .error`💥 Migration ${migration.version} failed with error: ${message}`;
+          this.logger.debug`🔍 Full error details: ${error}`;
 
           // Log SQL that caused the failure for better debugging
           this.logger.error`🔧 Failed SQL was: ${
@@ -471,10 +477,23 @@ export class MigrationRunner {
           if (transactionStarted && !transactionCommitted) {
             this.logger
               .warning`🔄 Rolling back transaction for failed rollback...`;
-            await transaction.rollback();
+            try {
+              await transaction.rollback();
+              this.logger.debug`✅ Rollback transaction reverted successfully`;
+            } catch (rollbackError) {
+              const rollbackMessage = rollbackError instanceof Error
+                ? rollbackError.message
+                : `${rollbackError}`;
+              this.logger
+                .error`🚨 CRITICAL: Failed to rollback migration rollback transaction: ${rollbackMessage}`;
+            }
           }
+          const message = error instanceof Error
+            ? error.message
+            : "unknown error";
           this.logger
-            .error`💥 Rollback of migration ${version} failed: ${error.message}`;
+            .error`💥 Rollback of migration ${version} failed: ${message}`;
+          this.logger.debug`Full rollback error: ${error}`;
           throw error;
         }
       }

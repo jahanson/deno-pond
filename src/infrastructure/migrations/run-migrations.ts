@@ -51,8 +51,9 @@ async function testNormalMigrations() {
       );
       testLogger.info`🎉 Migrations completed successfully!`;
     } catch (error) {
-      testLogger.error`💥 Migration failed: ${error.message}`;
-      testLogger.debug`Full error:`, error;
+      const message = error instanceof Error ? error.message : "unknown error";
+      testLogger.error`💥 Migration failed: ${message}`;
+      testLogger.debug`Full error: ${error}`;
     }
 
     // Check final state

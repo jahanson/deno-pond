@@ -1,6 +1,5 @@
 import { Client, Pool, Transaction } from "@db/postgres";
 import { getLogger } from "@logtape/logtape";
-import { configurePondLogging } from "../logging/config.ts";
 
 /**
  * Configuration options for database connection.
@@ -71,7 +70,9 @@ export class DatabaseConnection {
   constructor(private config: DatabaseConfig) {
     const mode = this.getConnectionMode();
     this.logger.debug`🔌 DatabaseConnection initialized with mode: ${mode}`;
-    this.logger.debug`📊 Configuration: ${this.config.databaseUrl ? 'DATABASE_URL' : 'discrete config'}, SSL: ${this.config.ssl ? 'enabled' : 'disabled'}`;
+    this.logger.debug`📊 Configuration: ${
+      this.config.databaseUrl ? "DATABASE_URL" : "discrete config"
+    }, SSL: ${this.config.ssl ? "enabled" : "disabled"}`;
   }
 
   /**
@@ -121,7 +122,10 @@ export class DatabaseConnection {
       }
     } catch (error) {
       const duration = Math.round(performance.now() - startTime);
-      this.logger.error`💥 Database operation failed after ${duration}ms: ${error.message}`;
+      const message = error instanceof Error ? error.message : "unknown error";
+      this.logger
+        .error`💥 Database operation failed after ${duration}ms: ${message}`;
+      this.logger.debug`Full error: ${error}`;
       throw error;
     }
   }
@@ -175,7 +179,8 @@ export class DatabaseConnection {
         transactionCommitted = true;
 
         const duration = Math.round(performance.now() - startTime);
-        this.logger.info`✅ Transaction committed successfully in ${duration}ms`;
+        this.logger
+          .info`✅ Transaction committed successfully in ${duration}ms`;
         return result;
       } catch (error) {
         if (transactionStarted && !transactionCommitted) {
@@ -184,12 +189,18 @@ export class DatabaseConnection {
             await transaction.rollback();
             this.logger.debug`✅ Transaction rollback successful`;
           } catch (rollbackError) {
-            this.logger.error`🚨 CRITICAL: Failed to rollback transaction: ${rollbackError}`;
+            this.logger
+              .error`🚨 CRITICAL: Failed to rollback transaction: ${rollbackError}`;
           }
         }
 
         const duration = Math.round(performance.now() - startTime);
-        this.logger.error`💥 Transaction failed and rolled back after ${duration}ms: ${error.message}`;
+        const message = error instanceof Error
+          ? error.message
+          : "unknown error";
+        this.logger
+          .error`💥 Transaction failed and rolled back after ${duration}ms: ${message}`;
+        this.logger.debug`Full error: ${error}`;
         throw error;
       }
     });
@@ -207,8 +218,10 @@ export class DatabaseConnection {
     sql: TemplateStringsArray,
     ...values: unknown[]
   ) {
-    const sqlPreview = sql.join('?').substring(0, 100);
-    this.logger.debug`📊 Executing queryObject: ${sqlPreview}${sqlPreview.length >= 100 ? '...' : ''}`;
+    const sqlPreview = sql.join("?").substring(0, 100);
+    this.logger.debug`📊 Executing queryObject: ${sqlPreview}${
+      sqlPreview.length >= 100 ? "..." : ""
+    }`;
 
     const startTime = performance.now();
     try {
@@ -217,11 +230,14 @@ export class DatabaseConnection {
       });
 
       const duration = Math.round(performance.now() - startTime);
-      this.logger.debug`✅ QueryObject completed - ${result.rows.length} rows in ${duration}ms`;
+      this.logger
+        .debug`✅ QueryObject completed - ${result.rows.length} rows in ${duration}ms`;
       return result;
     } catch (error) {
       const duration = Math.round(performance.now() - startTime);
-      this.logger.error`💥 QueryObject failed after ${duration}ms: ${error.message}`;
+      const message = error instanceof Error ? error.message : "unknown error";
+      this.logger.error`💥 QueryObject failed after ${duration}ms: ${message}`;
+      this.logger.debug`Full error: ${error}`;
       throw error;
     }
   }
@@ -235,8 +251,10 @@ export class DatabaseConnection {
    * @returns Promise resolving to query results
    */
   async queryArray(sql: TemplateStringsArray, ...values: unknown[]) {
-    const sqlPreview = sql.join('?').substring(0, 100);
-    this.logger.debug`📋 Executing queryArray: ${sqlPreview}${sqlPreview.length >= 100 ? '...' : ''}`;
+    const sqlPreview = sql.join("?").substring(0, 100);
+    this.logger.debug`📋 Executing queryArray: ${sqlPreview}${
+      sqlPreview.length >= 100 ? "..." : ""
+    }`;
 
     const startTime = performance.now();
     try {
@@ -245,11 +263,15 @@ export class DatabaseConnection {
       });
 
       const duration = Math.round(performance.now() - startTime);
-      this.logger.debug`✅ QueryArray completed - ${result.rowCount || 0} rows in ${duration}ms`;
+      this.logger.debug`✅ QueryArray completed - ${
+        result.rowCount || 0
+      } rows in ${duration}ms`;
       return result;
     } catch (error) {
       const duration = Math.round(performance.now() - startTime);
-      this.logger.error`💥 QueryArray failed after ${duration}ms: ${error.message}`;
+      const message = error instanceof Error ? error.message : "unknown error";
+      this.logger.error`💥 QueryArray failed after ${duration}ms: ${message}`;
+      this.logger.debug`Full error: ${error}`;
       throw error;
     }
   }
@@ -269,7 +291,8 @@ export class DatabaseConnection {
     const lazy = opts?.lazy ?? (Deno.env.get("DB_POOL_LAZY") === "true");
     const poolSize = this.config.poolSize || 10;
 
-    this.logger.info`🏊 Initializing connection pool - size: ${poolSize}, lazy: ${lazy}`;
+    this.logger
+      .info`🏊 Initializing connection pool - size: ${poolSize}, lazy: ${lazy}`;
 
     this.pool = new Pool(connectionConfig, poolSize, lazy);
 
@@ -282,7 +305,8 @@ export class DatabaseConnection {
    */
   private getConnectionConfig() {
     const buildTlsConfig = (sslMode?: string) => {
-      const tlsRequested = this.config.ssl ?? (sslMode ? sslMode !== "disable" : undefined);
+      const tlsRequested = this.config.ssl ??
+        (sslMode ? sslMode !== "disable" : undefined);
       if (!tlsRequested && !this.config.caCertificate) {
         return undefined;
       }
@@ -301,8 +325,12 @@ export class DatabaseConnection {
 
       const hostname = url.hostname || this.config.host;
       const port = url.port ? Number(url.port) : this.config.port;
-      const user = url.username ? decodeURIComponent(url.username) : this.config.user;
-      const password = url.password ? decodeURIComponent(url.password) : this.config.password;
+      const user = url.username
+        ? decodeURIComponent(url.username)
+        : this.config.user;
+      const password = url.password
+        ? decodeURIComponent(url.password)
+        : this.config.password;
       const database = url.pathname && url.pathname !== "/"
         ? decodeURIComponent(url.pathname.replace(/^\//, ""))
         : this.config.database;
@@ -339,7 +367,8 @@ export class DatabaseConnection {
     this.logger.info`🔌 Initializing single client connection`;
 
     const connectionConfig = this.getConnectionConfig();
-    this.logger.debug`🔗 Using resolved connection configuration for client setup`;
+    this.logger
+      .debug`🔗 Using resolved connection configuration for client setup`;
     this.client = new Client(connectionConfig);
 
     const startTime = performance.now();
@@ -394,10 +423,12 @@ export class DatabaseConnection {
           await this.client.queryArray`SELECT 1`;
 
           const duration = Math.round(performance.now() - startTime);
-          this.logger.info`🎉 Health check PASSED using existing client in ${duration}ms`;
+          this.logger
+            .info`🎉 Health check PASSED using existing client in ${duration}ms`;
           return true;
         }
-        this.logger.debug`⚠️  Single mode but no client - using lightweight probe`;
+        this.logger
+          .debug`⚠️  Single mode but no client - using lightweight probe`;
         // Single mode but no client yet - use probe without initializing persistent client
       } else { // mode === "pool"
         if (this.pool) {
@@ -408,7 +439,8 @@ export class DatabaseConnection {
             await client.queryArray`SELECT 1`;
 
             const duration = Math.round(performance.now() - startTime);
-            this.logger.info`🎉 Health check PASSED using pool in ${duration}ms`;
+            this.logger
+              .info`🎉 Health check PASSED using pool in ${duration}ms`;
             return true;
           } finally {
             client.release();
@@ -427,15 +459,18 @@ export class DatabaseConnection {
         await oneOff.queryArray`SELECT 1`;
 
         const duration = Math.round(performance.now() - startTime);
-        this.logger.info`🎉 Health check PASSED using probe connection in ${duration}ms`;
+        this.logger
+          .info`🎉 Health check PASSED using probe connection in ${duration}ms`;
         return true;
       } finally {
         await oneOff.end();
       }
     } catch (error) {
       const duration = Math.round(performance.now() - startTime);
-      this.logger.error`💥 Database health check FAILED after ${duration}ms: ${error.message}`;
-      this.logger.debug`🔍 Health check error details:`, error;
+      const message = error instanceof Error ? error.message : "unknown error";
+      this.logger
+        .error`💥 Database health check FAILED after ${duration}ms: ${message}`;
+      this.logger.debug`🔍 Health check error details: ${error}`;
       return false;
     }
   }
@@ -450,7 +485,8 @@ export class DatabaseConnection {
   static fromEnv(): DatabaseConnection {
     // Create a temporary logger for static method
     const staticLogger = getLogger(["deno-pond", "database", "config"]);
-    staticLogger.debug`⚙️  Loading database configuration from environment variables`;
+    staticLogger
+      .debug`⚙️  Loading database configuration from environment variables`;
 
     const databaseUrl = Deno.env.get("DATABASE_URL");
     const env = Deno.env.get("NODE_ENV") || Deno.env.get("DENO_ENV") ||
@@ -475,10 +511,13 @@ export class DatabaseConnection {
       mode: explicitMode || (env === "production" ? "pool" : "single"),
     };
 
-    const configType = databaseUrl ? "DATABASE_URL" : "discrete environment variables";
+    const configType = databaseUrl
+      ? "DATABASE_URL"
+      : "discrete environment variables";
     const finalMode = config.mode;
 
-    staticLogger.info`✅ Database configuration loaded from ${configType} (mode: ${finalMode})`;
+    staticLogger
+      .info`✅ Database configuration loaded from ${configType} (mode: ${finalMode})`;
 
     return new DatabaseConnection(config);
   }
