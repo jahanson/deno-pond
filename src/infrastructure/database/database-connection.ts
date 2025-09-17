@@ -123,7 +123,9 @@ export class DatabaseConnection {
    * @param fn - Function to execute within the transaction
    * @returns Promise resolving to the function's result
    */
-  async withTransaction<T>(fn: (transaction: Transaction) => Promise<T>): Promise<T> {
+  async withTransaction<T>(
+    fn: (transaction: Transaction) => Promise<T>,
+  ): Promise<T> {
     return await this.withClient(async (client) => {
       const transaction = client.createTransaction("user_transaction");
 

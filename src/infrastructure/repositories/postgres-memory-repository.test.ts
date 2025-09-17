@@ -9,12 +9,13 @@ import { Embedding } from "@/domain/entities/embedding.ts";
 import { Source } from "@/domain/entities/source.ts";
 import { MemoryStatus, SourceType } from "@/domain/shared/types.ts";
 import { PostgresMemoryRepository } from "./postgres-memory-repository.ts";
+import { IDatabaseClient, IDatabaseTransaction } from "../database/database-client.interface.ts";
 
 /**
  * Transaction stub for testing PostgresMemoryRepository integration.
  * Records SQL calls and returns canned responses that match PostgreSQL format.
  */
-class TransactionStub {
+class TransactionStub implements IDatabaseTransaction {
   public sqlCalls: string[] = [];
   private memoryData = {
     id: "test-memory-id",
@@ -34,53 +35,77 @@ class TransactionStub {
     // Aggregated JSON arrays (what PostgreSQL would return)
     tags: [
       { raw: "test-tag", normalized: "test tag", slug: "test-tag" },
-      { raw: "another-tag", normalized: "another tag", slug: "another-tag" }
+      { raw: "another-tag", normalized: "another tag", slug: "another-tag" },
     ],
     entities: [
       { text: "Test Entity", type: "PERSON" },
-      { text: "Another Entity", type: "ORGANIZATION" }
+      { text: "Another Entity", type: "ORGANIZATION" },
     ],
     actions: [
       { action: "test-action", slug: "test-action" },
-      { action: "another-action", slug: "another-action" }
+      { action: "another-action", slug: "another-action" },
     ],
   };
 
-  async queryArray(sql: TemplateStringsArray | string): Promise<{ rowCount: number }> {
+  queryArray(
+    sql: TemplateStringsArray | string,
+    ..._args: unknown[]
+  ): Promise<{ rowCount?: number }> {
     this.sqlCalls.push(sql.toString());
 
     // Mock pond_set_tenant_context call
     if (sql.toString().includes("pond_set_tenant_context")) {
-      return { rowCount: 1 };
+      return Promise.resolve({ rowCount: 1 });
     }
 
-    return { rowCount: 1 };
+    return Promise.resolve({ rowCount: 1 });
   }
 
-  async queryObject<T>(sql: TemplateStringsArray | string): Promise<{ rows: T[] }> {
+  queryObject<T>(sql: TemplateStringsArray | string, ..._args: unknown[]): Promise<{ rows: T[] }> {
     this.sqlCalls.push(sql.toString());
 
     // Mock the complex findById query with aggregated JSON
-    if (sql.toString().includes("SELECT") && sql.toString().includes("memories m")) {
-      return { rows: [this.memoryData as T] };
+    if (
+      sql.toString().includes("SELECT") && sql.toString().includes("memories m")
+    ) {
+      return Promise.resolve({ rows: [this.memoryData as T] });
     }
 
-    return { rows: [] };
+    return Promise.resolve({ rows: [] });
+  }
+
+  begin(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  commit(): Promise<void> {
+    return Promise.resolve();
+  }
+
+  rollback(): Promise<void> {
+    return Promise.resolve();
   }
 }
 
 /**
  * Client stub that creates Transaction stubs and tracks calls.
  */
-class ClientStub {
+class ClientStub implements IDatabaseClient {
   public transactionStub = new TransactionStub();
 
-  async queryArray(sql: TemplateStringsArray | string): Promise<{ rowCount: number }> {
-    return this.transactionStub.queryArray(sql);
+  queryArray(
+    sql: TemplateStringsArray | string,
+    ..._args: unknown[]
+  ): Promise<{ rowCount?: number }> {
+    return this.transactionStub.queryArray(sql, ..._args);
   }
 
-  async queryObject<T>(sql: TemplateStringsArray | string): Promise<{ rows: T[] }> {
-    return this.transactionStub.queryObject(sql);
+  queryObject<T>(sql: TemplateStringsArray | string, ..._args: unknown[]): Promise<{ rows: T[] }> {
+    return this.transactionStub.queryObject(sql, ..._args);
+  }
+
+  createTransaction(_name?: string): IDatabaseTransaction {
+    return new TransactionStub();
   }
 }
 
@@ -91,7 +116,7 @@ class ClientStub {
 
 Deno.test("PostgresMemoryRepository.findById - should call setTenantContext and execute proper SQL", async () => {
   const clientStub = new ClientStub();
-  const repository = new PostgresMemoryRepository(clientStub as any);
+  const repository = new PostgresMemoryRepository(clientStub);
   const tenantId = "123e4567-e89b-12d3-a456-426614174000";
 
   // Actually call the repository method (this would fail if repository breaks)
@@ -119,12 +144,12 @@ Deno.test("PostgresMemoryRepository.findById - should call setTenantContext and 
 
 Deno.test("PostgresMemoryRepository.findById - should successfully hydrate stored memory with all metadata", async () => {
   const clientStub = new ClientStub();
-  const repository = new PostgresMemoryRepository(clientStub as any);
+  const repository = new PostgresMemoryRepository(clientStub);
 
   // This is the critical test: can the repository hydrate a stored memory?
   // (Would throw "Cannot modify stored memory" before the fix)
   const memory = await repository.findById("test-memory-id", {
-    tenantId: "123e4567-e89b-12d3-a456-426614174000"
+    tenantId: "123e4567-e89b-12d3-a456-426614174000",
   });
 
   // Verify embedding was hydrated correctly
@@ -166,12 +191,12 @@ Deno.test("PostgresMemoryRepository.findById - should successfully hydrate store
 Deno.test("PostgresMemoryRepository.findById - should return null for non-existent memory", async () => {
   const clientStub = new ClientStub();
   // Override to return empty result set
-  clientStub.transactionStub.queryObject = async () => ({ rows: [] });
+  clientStub.transactionStub.queryObject = () => Promise.resolve({ rows: [] });
 
-  const repository = new PostgresMemoryRepository(clientStub as any);
+  const repository = new PostgresMemoryRepository(clientStub);
 
   const memory = await repository.findById("non-existent-id", {
-    tenantId: "123e4567-e89b-12d3-a456-426614174000"
+    tenantId: "123e4567-e89b-12d3-a456-426614174000",
   });
 
   assertEquals(memory, null);
@@ -195,6 +220,6 @@ Deno.test("Memory hydration pattern - should fail if we tried the old way (seedi
   assertThrows(
     () => memory.setEmbedding(embedding),
     Error,
-    "Cannot modify stored memory"
+    "Cannot modify stored memory",
   );
 });

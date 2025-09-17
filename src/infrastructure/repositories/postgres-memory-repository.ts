@@ -1,4 +1,3 @@
-import { Client, Transaction } from "@db/postgres";
 import { Memory } from "@/domain/entities/memory.ts";
 import { Embedding } from "@/domain/entities/embedding.ts";
 import { Source } from "@/domain/entities/source.ts";
@@ -13,6 +12,7 @@ import {
   SimilarityMetric,
   SimilarResult,
 } from "./memory-repository.interface.ts";
+import { IDatabaseClient, IDatabaseTransaction } from "../database/database-client.interface.ts";
 
 /**
  * PostgreSQL implementation of the MemoryRepository interface.
@@ -39,9 +39,9 @@ export class PostgresMemoryRepository implements MemoryRepository {
   /**
    * Creates a new PostgreSQL memory repository.
    *
-   * @param client - Connected PostgreSQL client or transaction from @db/postgres
+   * @param client - Database client implementing IDatabaseClient interface
    */
-  constructor(private client: Client | Transaction) {}
+  constructor(private client: IDatabaseClient | IDatabaseTransaction) {}
 
   /**
    * Sets the tenant context for RLS enforcement.
@@ -49,7 +49,7 @@ export class PostgresMemoryRepository implements MemoryRepository {
    */
   private async setTenantContext(
     tenantId: string,
-    executor: Client | Transaction,
+    executor: IDatabaseClient | IDatabaseTransaction,
   ): Promise<void> {
     await executor
       .queryArray`SELECT pond_set_tenant_context(${tenantId}::uuid)`;
@@ -65,11 +65,10 @@ export class PostgresMemoryRepository implements MemoryRepository {
     } else if ("commit" in this.client && "rollback" in this.client) {
       // Already in a transaction context
       await this.setTenantContext(tenantId, this.client);
-      return this.performSave(memory, tenantId, this.client as Transaction);
+      return this.performSave(memory, tenantId, this.client);
     } else {
       // Create new transaction wrapper
-      const client = this.client as Client;
-      const transaction = client.createTransaction("memory_save");
+      const transaction = this.client.createTransaction("memory_save");
       try {
         await transaction.begin();
         await this.setTenantContext(tenantId, transaction);
@@ -85,7 +84,7 @@ export class PostgresMemoryRepository implements MemoryRepository {
   private async performSave(
     memory: Memory,
     tenantId: string,
-    tx: Transaction,
+    tx: IDatabaseTransaction,
   ): Promise<void> {
     // Insert main memory record - RLS will enforce tenant isolation
     const memoryResult = await tx.queryObject<{ id: string }>`

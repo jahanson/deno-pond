@@ -115,7 +115,10 @@ export interface MemoryRepository {
    * @param options - Query options including tenant context
    * @returns The Memory object if found, null otherwise
    */
-  findByContentHash(hash: string, options: QueryOptions): Promise<Memory | null>;
+  findByContentHash(
+    hash: string,
+    options: QueryOptions,
+  ): Promise<Memory | null>;
 
   /**
    * Find semantically similar memories using vector similarity search.
@@ -154,7 +157,11 @@ export interface MemoryRepository {
    * @param limit - Maximum number of results to return (default: 50)
    * @returns Array of memories matching the search query
    */
-  search(query: string, options: QueryOptions, limit?: number): Promise<Memory[]>;
+  search(
+    query: string,
+    options: QueryOptions,
+    limit?: number,
+  ): Promise<Memory[]>;
 
   /**
    * Retrieve all memories for a tenant with pagination support.
@@ -164,7 +171,11 @@ export interface MemoryRepository {
    * @param offset - Number of records to skip for pagination (default: 0)
    * @returns Array of memories ordered by creation date (newest first)
    */
-  findAll(options: QueryOptions, limit?: number, offset?: number): Promise<Memory[]>;
+  findAll(
+    options: QueryOptions,
+    limit?: number,
+    offset?: number,
+  ): Promise<Memory[]>;
 
   /**
    * Delete a Memory from the repository.
