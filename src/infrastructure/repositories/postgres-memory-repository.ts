@@ -91,16 +91,24 @@ export class PostgresMemoryRepository implements MemoryRepository {
       } else {
         this.logger.debug`🔄 Creating new transaction for save operation`;
         // Create new transaction wrapper
-        const transaction = this.client.createTransaction("memory_save");
+        let transaction;
         try {
+          transaction = this.client.createTransaction("memory_save");
           await transaction.begin();
           await this.setTenantContext(tenantId, transaction);
           await this.performSave(memory, tenantId, transaction);
           await transaction.commit();
           this.logger.debug`✅ Transaction committed successfully`;
         } catch (error) {
-          this.logger.warning`🔄 Rolling back transaction due to save error`;
-          await transaction.rollback();
+          this.logger.error`💥 Transaction error: ${error.message}`;
+          if (transaction) {
+            try {
+              this.logger.warning`🔄 Rolling back transaction due to save error`;
+              await transaction.rollback();
+            } catch (rollbackError) {
+              this.logger.error`💥 Rollback failed: ${rollbackError.message}`;
+            }
+          }
           throw error;
         }
       }
@@ -357,8 +365,12 @@ export class PostgresMemoryRepository implements MemoryRepository {
       if (
         row.embedding_vector && row.embedding_dimensions && row.embedding_model
       ) {
+        // Parse pgvector string back to JavaScript array
+        // pgvector format: "[0.1,0.2,0.3]" -> [0.1, 0.2, 0.3]
+        const vectorArray = JSON.parse(row.embedding_vector) as number[];
+
         const embedding = new Embedding(
-          row.embedding_vector,
+          vectorArray,
           row.embedding_model,
         );
         memory = memory.setEmbedding(embedding);
