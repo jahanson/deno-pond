@@ -1,4 +1,4 @@
-import { assertEquals, assertThrows } from "jsr:@std/assert";
+import { assertEquals, assertThrows } from "@std/assert";
 import { Memory } from "./memory.ts";
 import { ValidationError } from "@/domain/shared/errors.ts";
 import { MemoryStatus, SourceType } from "@/domain/shared/types.ts";
@@ -196,6 +196,24 @@ Deno.test("Memory - should prevent source modification after being stored", () =
 
   assertThrows(
     () => memory.setSource(source),
+    Error,
+    "Cannot modify stored memory",
+  );
+});
+
+Deno.test("Memory - should fail when trying to modify stored memory (hydration pattern test)", () => {
+  // This demonstrates the problem that would occur without the hydration fix
+  let memory = new Memory("Test memory");
+
+  // Simulate old broken approach: mark as stored first
+  memory = memory.markAsStored();
+
+  // Now try to add metadata - this should throw
+  const validVector = new Array(512).fill(0).map((_, i) => (i + 1) / 512);
+  const embedding = new Embedding(validVector, "test-model");
+
+  assertThrows(
+    () => memory.setEmbedding(embedding),
     Error,
     "Cannot modify stored memory",
   );

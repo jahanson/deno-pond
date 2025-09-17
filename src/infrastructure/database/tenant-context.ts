@@ -1,4 +1,4 @@
-import { Client } from "jsr:@db/postgres";
+import { Client } from "@db/postgres";
 
 /**
  * Multi-tenant context manager for PostgreSQL.
@@ -83,7 +83,7 @@ export class TenantContext {
   /**
    * Create a new tenant (if needed for initialization)
    */
-  async createTenant(tenantId: string, name: string): Promise<void> {
+  createTenant(tenantId: string, name: string): void {
     // In a more complex system, you might have a tenants table
     // For now, tenants are identified by UUID and managed by the application
     console.log(`Tenant ${tenantId} (${name}) initialized`);

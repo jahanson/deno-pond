@@ -5,8 +5,8 @@ import {
   assertMatch,
   assertNotEquals,
   assertThrows,
-} from "jsr:@std/assert";
-import { FakeTime } from "jsr:@std/testing/time";
+} from "@std/assert";
+import { FakeTime } from "@std/testing/time";
 import { Source } from "./source.ts";
 import { ValidationError } from "@/domain/shared/errors.ts";
 import { SourceType } from "@/domain/shared/types.ts";
