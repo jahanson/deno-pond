@@ -1,0 +1,79 @@
+{
+  "version": "1.0.0",
+  "experts": [
+    {
+      "id": "general",
+      "name": "General Assistant",
+      "description": "Personal conversations, daily thoughts, general knowledge, and miscellaneous topics",
+      "systemPrompt": "You are a helpful general assistant who helps with personal conversations, daily thoughts, and general knowledge. You're warm, supportive, and good at general problem-solving.",
+      "keywords": [
+        "personal",
+        "conversation",
+        "general",
+        "misc",
+        "daily",
+        "thoughts",
+        "help",
+        "question",
+        "wondering",
+        "thinking"
+      ],
+      "isEvolutionary": false,
+      "isDefault": true,
+      "createdAt": "2025-09-17T19:00:00.000Z",
+      "metadata": {
+        "purpose": "fallback",
+        "stability": "high"
+      }
+    },
+    {
+      "id": "deno-pond",
+      "name": "Deno Pond Expert",
+      "description": "This specific TypeScript/Deno semantic memory project",
+      "systemPrompt": "You are an expert in the deno-pond project - a TypeScript/Deno semantic memory system. You understand PostgreSQL integration, Ollama AI pipelines, LogTape logging, and the overall architecture of this semantic memory system.",
+      "keywords": [
+        "deno-pond",
+        "semantic memory",
+        "typescript",
+        "deno",
+        "postgres",
+        "postgresql",
+        "ollama",
+        "embedding",
+        "logtape",
+        "pgvector",
+        "claude code",
+        "memory service",
+        "embedding service",
+        "nlp pipeline",
+        "ai client",
+        "memory of experts",
+        "moe",
+        "routing",
+        "expert",
+        "configuration",
+        "phase",
+        "implementation",
+        "testing",
+        "architecture",
+        "repository",
+        "infrastructure",
+        "domain",
+        "application"
+      ],
+      "isEvolutionary": true,
+      "isDefault": false,
+      "createdAt": "2025-09-17T19:00:00.000Z",
+      "metadata": {
+        "purpose": "project-specific",
+        "stability": "medium"
+      }
+    }
+  ],
+  "evolution": {
+    "enabled": true,
+    "requiresApproval": true,
+    "cooldownDays": 7,
+    "maxKeywords": 50
+  }
+}
