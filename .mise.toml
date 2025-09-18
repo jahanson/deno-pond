@@ -2,6 +2,7 @@
 DATABASE_URL = 'op://Private/Supabase Connection Strings/pond_dev'
 CA_CERT_PATH = '.private/prod-ca-2021.crt'
 LOGFIRE_WRITE_TOKEN = 'op://Private/czesn34xkbz7oxnrrjnsct7som/credential'
+OLLAMA_BASE_URL = 'http://10.1.1.71:11434'
 OTEL_DENO = 'true'
 OTEL_EXPORTER_OTLP_TRACES_ENDPOINT = 'https://logfire-us.pydantic.dev/v1/traces'
 OTEL_EXPORTER_OTLP_LOGS_ENDPOINT = 'https://logfire-us.pydantic.dev/v1/logs'

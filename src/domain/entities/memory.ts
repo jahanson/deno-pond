@@ -14,6 +14,7 @@ export class Memory {
   readonly status: MemoryStatus;
   readonly createdAt: Date;
   readonly contentHash: string;
+  readonly expertId: string;
   private readonly tags: Tag[];
   private readonly entities: Entity[];
   private readonly actions: Action[];
@@ -29,6 +30,7 @@ export class Memory {
     actions: Action[] = [],
     embedding?: Embedding,
     source?: Source,
+    expertId: string = "general", // Default to general expert
   ) {
     // Business rule: Content validation
     this.validateContent(content);
@@ -37,6 +39,7 @@ export class Memory {
     this.status = status;
     this.createdAt = createdAt ?? new Date();
     this.contentHash = this.generateContentHash(content);
+    this.expertId = expertId;
     this.tags = [...tags]; // defensive copy
     this.entities = [...entities]; // defensive copy
     this.actions = [...actions]; // defensive copy
@@ -78,6 +81,7 @@ export class Memory {
       this.actions,
       this.embedding,
       this.source,
+      this.expertId,
     );
   }
 
@@ -93,6 +97,7 @@ export class Memory {
       this.actions,
       this.embedding,
       this.source,
+      this.expertId,
     );
   }
 
@@ -107,6 +112,7 @@ export class Memory {
       this.actions,
       this.embedding,
       this.source,
+      this.expertId,
     );
   }
 
@@ -121,6 +127,7 @@ export class Memory {
       [...this.actions, action],
       this.embedding,
       this.source,
+      this.expertId,
     );
   }
 
@@ -135,6 +142,7 @@ export class Memory {
       this.actions,
       embedding,
       this.source,
+      this.expertId,
     );
   }
 
@@ -149,6 +157,7 @@ export class Memory {
       this.actions,
       this.embedding,
       source,
+      this.expertId,
     );
   }
 

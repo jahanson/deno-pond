@@ -100,13 +100,13 @@ export class PostgresMemoryRepository implements MemoryRepository {
           await transaction.commit();
           this.logger.debug`✅ Transaction committed successfully`;
         } catch (error) {
-          this.logger.error`💥 Transaction error: ${error.message}`;
+          this.logger.error`💥 Transaction error: ${error instanceof Error ? error.message : String(error)}`;
           if (transaction) {
             try {
               this.logger.warning`🔄 Rolling back transaction due to save error`;
               await transaction.rollback();
             } catch (rollbackError) {
-              this.logger.error`💥 Rollback failed: ${rollbackError.message}`;
+              this.logger.error`💥 Rollback failed: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`;
             }
           }
           throw error;
@@ -367,7 +367,10 @@ export class PostgresMemoryRepository implements MemoryRepository {
       ) {
         // Parse pgvector string back to JavaScript array
         // pgvector format: "[0.1,0.2,0.3]" -> [0.1, 0.2, 0.3]
-        const vectorArray = JSON.parse(row.embedding_vector) as number[];
+        // Handle both string (from actual DB) and array (from tests)
+        const vectorArray = typeof row.embedding_vector === 'string'
+          ? JSON.parse(row.embedding_vector) as number[]
+          : row.embedding_vector;
 
         const embedding = new Embedding(
           vectorArray,
